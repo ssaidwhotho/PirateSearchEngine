@@ -14,12 +14,14 @@ class InvertedIndex:
             n += 1
             # parsing means to make them into tokens
             # nltk tokenizer and stemmer!
-            current_doc = document  # Copy current document to use regex
-            current_doc = re.sub(r'\.', '',
-                                 current_doc)  # Removes ending punctuation, should theoretically keep inner punctuation
+            curr_url = document['url']  # This url needs to be saved to a json where key = n, value = url
+            current_doc = document['content']  # Copy current document to use regex
+            clean_text = re.sub('<[^>]*>', '', current_doc)
+            tokens = word_tokenize(clean_text)
+            tokens = [token.lower() for token in tokens if
+                               token.isalnum() or (token.replace(".", "").isalnum() and len(token) > 1)]
             # json.loads()
-            tokens = word_tokenize(current_doc)
-            tokens = list(set(tokens))  # Considering that parse doesn't already give unique results
+            # tokens = list(set(tokens))  # Considering that parse doesn't already give unique results
             
             token_len = len(tokens)
             fields = None
