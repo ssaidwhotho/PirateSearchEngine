@@ -2,8 +2,12 @@
 import re
 import json
 import os
+import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
+
+
+SAVE_FREQ = 100
 
 
 
@@ -25,22 +29,22 @@ class InvertedIndex:
         tokens = word_tokenize(clean_text)
         tokens = [token.lower() for token in tokens if
                   token.isalnum() or (token.replace(".", "").isalnum() and len(token) > 1)]
+        p_stemmer = PorterStemmer()
+        tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
         return tokens
 
     def build_index(self, documents) -> None:
-        n = -1  # So it starts with 0
+        n = -1
         # documents are json files
         for document in documents:
             n += 1
 
             curr_url = document['url']  # This url needs to be saved to a json where key = n, value = url
-            self.url_dict[n] = curr_url
             tokens = self.get_tokens(document)
-            p_stemmer = PorterStemmer()
-            tokens = [p_stemmer.stem(word).lower() for word in tokens]  # Stem using PorterStemmer
             # tokens = list(set(tokens))  # Part of the Sudo-Code, but doesn't make any sense...
 
             doc_len = len(tokens)
+            self.url_dict[n] = (curr_url, doc_len)
             fields = None  #TODO: Make a list of bolded & header (important) words
 
             for token in tokens:
@@ -50,33 +54,39 @@ class InvertedIndex:
                 elif n not in self.hash_table[token]:
                     self.hash_table[token][n] = Posting(n, doc_len, fields)
 
-                self.hash_table[token][n].increment(n)
+                self.hash_table[token][n].increment()
 
-            if n % 10 == 0:
+            if n % SAVE_FREQ == 0 and n != 0:
                 print(f"Processed {n} documents, saving to json file...")
                 self.save_to_json(n)
 
-        print("Finished processing all documents, saving final hash_table to json.")
+        print(f"Finished processing all {n} documents, saving final hash_table to json.")
         if self.hash_table != {}:
-            self.save_to_json((n + 9) // 10 * 10) # Round up to nearest 10 for the file_name
+            self.save_to_json((n + (SAVE_FREQ-1)) // SAVE_FREQ * SAVE_FREQ) # Round up to nearest SAVE_FREQ for the file_name
 
-    def save_doc_id_json(self, n) -> None:
+    def save_doc_id_json(self) -> None:
         # Save to json file
         with open('url_ids.json', 'w') as new_save_file:
             json.dump(self.url_dict, new_save_file)
 
     def save_to_json(self, n) -> None:
+        # Save Urls to matching doc_ids
+        self.save_doc_id_json()
+
         # Save to json file
-        new_file_name = f'inverted_index{n / 10}.json'
+        new_file_name = f'inverted_index{n / SAVE_FREQ}.json'
         with open(new_file_name, 'w') as new_save_file:
-            json.dump(self.convert_inner_dict_to_list(), new_save_file)
-            self.hash_table = {}
+            json.dump(
+            self.convert_inner_dict_to_list(), new_save_file)
+            self.hash_table = dict()
             self.save_files.append(new_file_name)
 
     def convert_inner_dict_to_list(self) -> dict:
         new_hash_table = dict()
         for key in self.hash_table.keys():
-            new_hash_table[key] = [self.hash_table[key][i] for i in range(len(self.hash_table[key].keys()))]
+            new_hash_table[key] = []
+            for i in self.hash_table[key].keys():
+                new_hash_table[key].append(self.hash_table[key][i].toJSON())
         return new_hash_table
 
     def merge_files(self) -> None:
@@ -130,15 +140,23 @@ class InvertedIndex:
 
 class Posting:
     def __init__(self, doc_id, doc_len, fields):
+
         self.doc_id = doc_id
         self.word_count = 0
-        self.doc_len = doc_len
-        self.tfidf = self.word_count / self.doc_len  # Frequency works for now, updates every word_count increment
-        self.fields = fields
+        #self.doc_len = doc_len
+        #self.tfidf = self.word_count / self.doc_len  # Frequency works for now, updates every word_count increment
+        #self.fields = fields
+
+    def toJSON(self):
+        return json.dumps(
+            self,
+            default=lambda o: o.__dict__,
+            sort_keys=True,
+            indent=4)
 
     def increment(self):
         self.word_count += 1
-        self.tfidf = self.word_count / self.doc_len # Update for new frequency
+        #self.tfidf = self.word_count / self.doc_len # Update for new frequency
 
     def get_doc_id(self):
         return self.doc_id
@@ -156,10 +174,16 @@ if __name__ == "__main__":
     directory = 'DEV'
     documents = []
     inverted_index = InvertedIndex()
+    LLLL = 0
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.endswith('.json'):
+                LLLL += 1
                 documents.append(inverted_index.read_json(os.path.join(root, file)))
-                print(documents)
+                if LLLL % 5000 == 0:
+                    print(f'Now appended {LLLL} documents')
+
+    print(f'Total documents to search: {LLLL}')
+    inverted_index.build_index(documents)
 
     exit()
