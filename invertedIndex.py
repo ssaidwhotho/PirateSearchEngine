@@ -37,7 +37,7 @@ class InvertedIndex:
             self.url_dict[n] = curr_url
             tokens = self.get_tokens(document)
             p_stemmer = PorterStemmer()
-            tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
+            tokens = [p_stemmer.stem(word).lower() for word in tokens]  # Stem using PorterStemmer
             # tokens = list(set(tokens))  # Part of the Sudo-Code, but doesn't make any sense...
 
             doc_len = len(tokens)
@@ -78,6 +78,54 @@ class InvertedIndex:
         for key in self.hash_table.keys():
             new_hash_table[key] = [self.hash_table[key][i] for i in range(len(self.hash_table[key].keys()))]
         return new_hash_table
+
+    def merge_files(self) -> None:
+        # Merge all the files into one
+        if len(self.save_files) == 0:
+            print("No files to merge.")
+            return
+
+        for letter in "abcdefghijklmnopqrstuvwxyz":  # Loop through all the letters
+            letter_dict = dict()
+            for next_file in self.save_files: # Loop through all the files
+                next_hast_table = dict()  #TODO: Is this needed to save data outside of the with statement?
+
+                with open(next_file, 'r') as f:  # Get tokens from the file that start with the letter
+                    next_hast_table = json.load(f)
+                    for key in next_hast_table.keys():
+                        if key[0] == letter:
+                            if key not in letter_dict:
+                                letter_dict[key] = next_hast_table[key]
+                            else:
+                                letter_dict[key] += next_hast_table[key]
+                            next_hast_table.pop(key)
+
+                with open(next_file, 'w') as f:  # Save the new hash_table without the letter tokens
+                    json.dump(next_hast_table, f)
+
+            with open(f'inverted_index_{letter}.json', 'w') as letter_file:  # Save the letter tokens to a new file
+                json.dump(letter_dict, letter_file)
+
+        other_char_dict = dict()
+        # Do this same thing one more time to check for tokens starting with non-letters
+        for next_file in self.save_files:
+            next_hast_table = dict()  # TODO: Is this needed to save data outside of the with statement?
+
+            with open(next_file, 'r') as f:  # Get the rest of the tokens from each file
+                next_hast_table = json.load(f)
+                for key in next_hast_table.keys():
+                        if key not in other_char_dict:
+                            other_char_dict[key] = next_hast_table[key]
+                        else:
+                            other_char_dict[key] += next_hast_table[key]
+                        next_hast_table.pop(key)
+
+            print(f"Finished merging {next_file}. Size should be 0: Size={len(next_hast_table)}")
+
+        with open('inverted_index_OTHERCHAR.json','w') as other_char_file:  # Save the rest of the tokens to a new file
+            json.dump(other_char_dict, other_char_file)
+
+        print("Finished merging all files into one per letter plus an OTHERCHAR.")
 
 
 class Posting:
