@@ -3,12 +3,15 @@ import re
 import json
 import os
 from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
 
 
 
 class InvertedIndex:
     def __init__(self):
         self.hash_table = {}
+        self.url_dict = {}
+        self.save_files = []
 
     @staticmethod
     def read_json(file_path) -> dict:
@@ -25,17 +28,20 @@ class InvertedIndex:
         return tokens
 
     def build_index(self, documents) -> None:
-        n = 0
+        n = -1  # So it starts with 0
         # documents are json files
         for document in documents:
             n += 1
 
             curr_url = document['url']  # This url needs to be saved to a json where key = n, value = url
+            self.url_dict[n] = curr_url
             tokens = self.get_tokens(document)
+            p_stemmer = PorterStemmer()
+            tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
             # tokens = list(set(tokens))  # Part of the Sudo-Code, but doesn't make any sense...
 
             doc_len = len(tokens)
-            fields = None  #TODO: Figure out what this is
+            fields = None  #TODO: Make a list of bolded & header (important) words
 
             for token in tokens:
                 if token not in self.hash_table:
@@ -45,7 +51,27 @@ class InvertedIndex:
                     self.hash_table[token][n] = Posting(n, doc_len, fields)
 
                 self.hash_table[token][n].increment(n)
-        # TODO: Save the url to a json file
+
+            if n % 10 == 0:
+                print(f"Processed {n} documents, saving to json file...")
+                self.save_to_json(n)
+
+        print("Finished processing all documents, saving final hash_table to json.")
+        if self.hash_table != {}:
+            self.save_to_json((n + 9) // 10 * 10) # Round up to nearest 10 for the file_name
+
+    def save_doc_id_json(self, n) -> None:
+        # Save to json file
+        with open('url_ids.json', 'w') as new_save_file:
+            json.dump(self.url_dict, new_save_file)
+
+    def save_to_json(self, n) -> None:
+        # Save to json file
+        new_file_name = f'inverted_index{n / 10}.json'
+        with open(new_file_name, 'w') as new_save_file:
+            json.dump(self.convert_inner_dict_to_list(), new_save_file)
+            self.hash_table = {}
+            self.save_files.append(new_file_name)
 
     def convert_inner_dict_to_list(self) -> dict:
         new_hash_table = dict()
