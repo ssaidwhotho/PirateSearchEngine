@@ -7,7 +7,7 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 
 
-SAVE_FREQ = 100
+SAVE_FREQ = 500
 
 
 
@@ -102,7 +102,8 @@ class InvertedIndex:
 
                 with open(next_file, 'r') as f:  # Get tokens from the file that start with the letter
                     next_hast_table = json.load(f)
-                    for key in next_hast_table.keys():
+                    next_hast_table_copy = next_hast_table.copy()
+                    for key in next_hast_table_copy.keys():
                         if key[0] == letter:
                             if key not in letter_dict:
                                 letter_dict[key] = next_hast_table[key]
@@ -123,7 +124,8 @@ class InvertedIndex:
 
             with open(next_file, 'r') as f:  # Get the rest of the tokens from each file
                 next_hast_table = json.load(f)
-                for key in next_hast_table.keys():
+                next_hast_table_copy = next_hast_table.copy()
+                for key in next_hast_table_copy.keys():
                         if key not in other_char_dict:
                             other_char_dict[key] = next_hast_table[key]
                         else:
@@ -131,6 +133,7 @@ class InvertedIndex:
                         next_hast_table.pop(key)
 
             print(f"Finished merging {next_file}. Size should be 0: Size={len(next_hast_table)}")
+            os.remove(next_file)
 
         with open('inverted_index_OTHERCHAR.json','w') as other_char_file:  # Save the rest of the tokens to a new file
             json.dump(other_char_dict, other_char_file)
@@ -185,5 +188,6 @@ if __name__ == "__main__":
 
     print(f'Total documents to search: {LLLL}')
     inverted_index.build_index(documents)
+    inverted_index.merge_files()
 
     exit()
