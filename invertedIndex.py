@@ -96,9 +96,10 @@ class InvertedIndex:
             return
 
         for letter in "abcdefghijklmnopqrstuvwxyz":  # Loop through all the letters
+            print(f"Starting to create file for letter: {letter}")
             letter_dict = dict()
-            for next_file in self.save_files: # Loop through all the files
-                next_hast_table = dict()  #TODO: Is this needed to save data outside of the with statement?
+            for next_file in self.save_files:  # Loop through all the files
+                next_hast_table = dict()  # TODO: Is this needed to save data outside of the with statement?
 
                 with open(next_file, 'r') as f:  # Get tokens from the file that start with the letter
                     next_hast_table = json.load(f)
@@ -117,7 +118,10 @@ class InvertedIndex:
             with open(f'inverted_index_{letter}.json', 'w') as letter_file:  # Save the letter tokens to a new file
                 json.dump(letter_dict, letter_file)
 
+            print(f"Finished creating file for letter: {letter}\n")
+
         other_char_dict = dict()
+        print("Starting to create file for Other Chars")
         # Do this same thing one more time to check for tokens starting with non-letters
         for next_file in self.save_files:
             next_hast_table = dict()  # TODO: Is this needed to save data outside of the with statement?
@@ -126,18 +130,19 @@ class InvertedIndex:
                 next_hast_table = json.load(f)
                 next_hast_table_copy = next_hast_table.copy()
                 for key in next_hast_table_copy.keys():
-                        if key not in other_char_dict:
-                            other_char_dict[key] = next_hast_table[key]
-                        else:
-                            other_char_dict[key] += next_hast_table[key]
-                        next_hast_table.pop(key)
+                    if key not in other_char_dict:
+                        other_char_dict[key] = next_hast_table[key]
+                    else:
+                        other_char_dict[key] += next_hast_table[key]
+                    next_hast_table.pop(key)
 
             print(f"Finished merging {next_file}. Size should be 0: Size={len(next_hast_table)}")
             os.remove(next_file)
 
-        with open('inverted_index_OTHERCHAR.json','w') as other_char_file:  # Save the rest of the tokens to a new file
+        with open('inverted_index_OTHERCHAR.json', 'w') as other_char_file:  # Save the rest of the tokens to a new file
             json.dump(other_char_dict, other_char_file)
 
+        print("Finished creating file for Other Chars\n")
         print("Finished merging all files into one per letter plus an OTHERCHAR.")
 
 
