@@ -2,92 +2,148 @@
 import re
 import json
 import os
-import nltk
+import sys
+import psutil
+
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
+from posting import Posting
+from bs4 import BeautifulSoup
+from hashing import sim_hash, Simhash
+
+SAVE_FREQ = 5000
 
 
-SAVE_FREQ = 500
-
-
-
-class InvertedIndex:
-    def __init__(self):
-        self.hash_table = {}
-        self.url_dict = {}
-        self.save_files = []
-
-    @staticmethod
-    def read_json(file_path) -> dict:
-        # read json file directly and return the dictionary
-        with open(file_path, 'r') as file:
-            return json.load(file)
-
-    def get_tokens(self, document) -> list:
-        current_doc = document['content']  # Copy current document to use regex
-        clean_text = re.sub('<[^>]*>', '', current_doc)
+def get_tokens(document) -> list:
+    try:
+        current_doc = document['content']  # Copy current document
+        soup = BeautifulSoup(current_doc, 'xml')  # Parse the document with BeautifulSoup
+        for script in soup(["script", "style"]):
+            script.extract()
+        clean_text = soup.get_text()
         tokens = word_tokenize(clean_text)
         tokens = [token.lower() for token in tokens if
                   token.isalnum() or (token.replace(".", "").isalnum() and len(token) > 1)]
         p_stemmer = PorterStemmer()
         tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
         return tokens
+    except Exception as e:
+        print(document['content'])
+        print(f"Error: {e}")
+        return []
+
+
+def get_memory_usage():
+    # Get the current memory usage of the program by percentage of total memory
+    process = psutil.Process(os.getpid())
+    return process.memory_percent()
+
+
+class InvertedIndex:
+    def __init__(self):
+        self.id = 0
+        self.hash_table = {}
+        self.url_dict = {}
+        self.save_files = []
+        self.bits = []
+
+    @staticmethod
+    def read_json(file_path) -> dict:
+        # read json file directly and return the dictionary
+        with open(file_path, 'r') as j_file:
+            return json.load(j_file)
+
+    def create_inverted_index(self) -> None:
+        """
+        This function is the starting function for creating the inverted index.
+        :return:
+        """
+        documents = []
+        # firstly we need to read all the documents
+        for root, dirs, files in os.walk('DEV'):
+            for file in files:
+                if file.endswith('.json'):
+                    documents.append(self.read_json(os.path.join(root, file)))  # read the json file
+
+        print(f"Total documents to search: {len(documents)}")
+
+        self.build_index(documents)  # build the inverted index
+
+    def compare_hash(self, obj: Simhash, url: str) -> bool:
+        # compare the hash with the existing hashes
+        # you will do a bitwise comparison to see if they are similar and if they're similar add 1 and then divide by 64
+        # if the result is greater than 0.9 then the hashes are similar
+        if len(self.bits) == 0:
+            self.bits.append((obj, url))
+            return False
+        for other_hash in self.bits:
+            if obj.similarity(other_hash[0]) >= 0.9:
+                # print(f"Document {url} is a duplicate of {other_hash[1]}. Skipping.")
+                return True
+        self.bits.append((obj, url))
+        return False
 
     def build_index(self, documents) -> None:
-        n = -1
-        # documents are json files
-        for document in documents:
-            n += 1
+        n = -1  # Document ID
+        print(f"Starting to create the inverted index.")
 
-            curr_url = document['url']  # This url needs to be saved to a json where key = n, value = url
-            tokens = self.get_tokens(document)
-            # tokens = list(set(tokens))  # Part of the Sudo-Code, but doesn't make any sense...
+        while len(documents) > 0:
+            batch = documents[:SAVE_FREQ]  # Get the first 1000 documents
+            documents = documents[SAVE_FREQ:]  # Remove the first 1000 documents
+            for document in batch:
+                tokens = get_tokens(document)
+                # hash the tokens and create the inverted index
+                if self.compare_hash(sim_hash(tokens), document['url']):  # Check if the document is a duplicate
+                    continue
+                n += 1
+                doc_len = len(tokens)
+                self.url_dict[n] = (document['url'], doc_len)  # save the url and the length of the document idk why
+                # we save the length though tbh
+                fields = None
 
-            doc_len = len(tokens)
-            self.url_dict[n] = (curr_url, doc_len)
-            fields = None  #TODO: Make a list of bolded & header (important) words
+                for i in range(len(tokens)):  # Loop through all the tokens
+                    if tokens[i] not in self.hash_table:
+                        self.hash_table[tokens[i]] = {n: Posting(n)}  # create a new token if it's a new token
+                    elif n not in self.hash_table[tokens[i]]:
+                        self.hash_table[tokens[i]][n] = Posting(n)  # create a new posting if the document is new
 
-            for token in tokens:
-                if token not in self.hash_table:
-                    self.hash_table[token] = {n: Posting(n, doc_len, fields)}
+                    self.hash_table[tokens[i]][n].increment()  # increment the word count
+                    self.hash_table[tokens[i]][n].add_position(i)  # add the position of the token
 
-                elif n not in self.hash_table[token]:
-                    self.hash_table[token][n] = Posting(n, doc_len, fields)
+            # memory = get_memory_usage()
+            # print(f"Memory usage is {memory}%")
+            # if get_memory_usage() > 10:
 
-                self.hash_table[token][n].increment()
+            self.sort_and_save_batch()  # generate partial files
+            print(f"Finished creating inverted index for batch {n + 1}")
+            self.hash_table = dict()  # clear the hash table
 
-            if n % SAVE_FREQ == 0 and n != 0:
-                print(f"Processed {n} documents, saving to json file...")
-                self.save_to_json(n)
-
-        print(f"Finished processing all {n} documents, saving final hash_table to json.")
-        if self.hash_table != {}:
-            self.save_to_json((n + (SAVE_FREQ-1)) // SAVE_FREQ * SAVE_FREQ) # Round up to nearest SAVE_FREQ for the file_name
-
-    def save_doc_id_json(self) -> None:
-        # Save to json file
-        with open('url_ids.json', 'w') as new_save_file:
-            json.dump(self.url_dict, new_save_file)
-
-    def save_to_json(self, n) -> None:
-        # Save Urls to matching doc_ids
-        self.save_doc_id_json()
-
-        # Save to json file
-        new_file_name = f'inverted_index{n / SAVE_FREQ}.json'
-        with open(new_file_name, 'w') as new_save_file:
-            json.dump(
-            self.convert_inner_dict_to_list(), new_save_file)
+        if len(self.hash_table) > 0:
+            self.sort_and_save_batch()
             self.hash_table = dict()
-            self.save_files.append(new_file_name)
 
-    def convert_inner_dict_to_list(self) -> dict:
-        new_hash_table = dict()
-        for key in self.hash_table.keys():
-            new_hash_table[key] = []
-            for i in self.hash_table[key].keys():
-                new_hash_table[key].append(self.hash_table[key][i].toJSON())
-        return new_hash_table
+        print("Finished creating the inverted index now merging files.")
+        self.merge_files()
+
+    def sort_and_save_batch(self) -> None:
+        # sort the hash table and save to custom txt file for seeking
+        # sort the dictionary by the keys alphabetically with numbers last
+        self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: (not x[0].isnumeric(), x[0])))
+        # every new line is a token and it's posting is to the right of the line
+        # create a new file for the batch
+        with open(f'inverted_index_{self.id}.txt', 'w') as new_save_file:
+            for key in self.hash_table.keys():
+                new_save_file.write(key)
+                for i in self.hash_table[key].keys():
+                    new_save_file.write(
+                        f" d{i}"  # document id
+                        f"w{self.hash_table[key][i].word_count}"  # word count
+                        f"t{self.hash_table[key][i].tfidf}"  # tf-idf
+                        f"p{self.hash_table[key][i].positions}")  # positions [list]
+                new_save_file.write("\n")
+            self.save_files.append(f'inverted_index_{self.id}.txt')
+
+        self.id += 1
 
     def merge_files(self) -> None:
         # Merge all the files into one
@@ -95,104 +151,50 @@ class InvertedIndex:
             print("No files to merge.")
             return
 
-        for letter in "abcdefghijklmnopqrstuvwxyz":  # Loop through all the letters
-            print(f"Starting to create file for letter: {letter}")
-            letter_dict = dict()
-            for next_file in self.save_files:  # Loop through all the files
-                next_hast_table = dict()  # TODO: Is this needed to save data outside of the with statement?
+        print("Starting to merge all files into one.")
+        # open all the files!
+        sys.exit()
+        # attempting multi-file merge
+        file_handles = []
+        for file in self.save_files:
+            file_handles.append(open(file, 'r'))
 
-                with open(next_file, 'r') as f:  # Get tokens from the file that start with the letter
-                    next_hast_table = json.load(f)
-                    next_hast_table_copy = next_hast_table.copy()
-                    for key in next_hast_table_copy.keys():
-                        if key[0] == letter:
-                            if key not in letter_dict:
-                                letter_dict[key] = next_hast_table[key]
-                            else:
-                                letter_dict[key] += next_hast_table[key]
-                            next_hast_table.pop(key)
+        # read a line for every file and then populate a term dictionary
+        term_dict = dict()
+        lines = []
+        for i in range(len(file_handles)):
+            line = file_handles[i].readline()
+            if line == '':
+                continue
+            lines.append(line)
+            term = line.split(' ')[0]
+            if term not in term_dict:
+                term_dict[term] = []
+            term_dict[term].append(i)
 
-                with open(next_file, 'w') as f:  # Save the new hash_table without the letter tokens
-                    json.dump(next_hast_table, f)
-
-            with open(f'inverted_index_{letter}.json', 'w') as letter_file:  # Save the letter tokens to a new file
-                json.dump(letter_dict, letter_file)
-
-            print(f"Finished creating file for letter: {letter}\n")
-
-        other_char_dict = dict()
-        print("Starting to create file for Other Chars")
-        # Do this same thing one more time to check for tokens starting with non-letters
-        for next_file in self.save_files:
-            next_hast_table = dict()  # TODO: Is this needed to save data outside of the with statement?
-
-            with open(next_file, 'r') as f:  # Get the rest of the tokens from each file
-                next_hast_table = json.load(f)
-                next_hast_table_copy = next_hast_table.copy()
-                for key in next_hast_table_copy.keys():
-                    if key not in other_char_dict:
-                        other_char_dict[key] = next_hast_table[key]
+        # merge the files
+        with open('inverted_index.txt', 'w') as f:
+            while len(term_dict) > 0:
+                min_term = min(term_dict.keys())
+                f.write(min_term)
+                for i in term_dict[min_term]:
+                    f.write(lines[i].split(' ')[1])
+                    line = file_handles[i].readline()
+                    if line == '':
+                        term_dict.pop(min_term)
                     else:
-                        other_char_dict[key] += next_hast_table[key]
-                    next_hast_table.pop(key)
+                        lines[i] = line
+                        term = line.split(' ')[0]
+                        if term not in term_dict:
+                            term_dict[term] = []
+                        term_dict[term].append(i)
 
-            print(f"Finished merging {next_file}. Size should be 0: Size={len(next_hast_table)}")
-            os.remove(next_file)
-
-        with open('inverted_index_OTHERCHAR.json', 'w') as other_char_file:  # Save the rest of the tokens to a new file
-            json.dump(other_char_dict, other_char_file)
-
-        print("Finished creating file for Other Chars\n")
-        print("Finished merging all files into one per letter plus an OTHERCHAR.")
-
-
-class Posting:
-    def __init__(self, doc_id, doc_len, fields):
-
-        self.doc_id = doc_id
-        self.word_count = 0
-        #self.doc_len = doc_len
-        #self.tfidf = self.word_count / self.doc_len  # Frequency works for now, updates every word_count increment
-        #self.fields = fields
-
-    def toJSON(self):
-        return json.dumps(
-            self,
-            default=lambda o: o.__dict__,
-            sort_keys=True,
-            indent=4)
-
-    def increment(self):
-        self.word_count += 1
-        #self.tfidf = self.word_count / self.doc_len # Update for new frequency
-
-    def get_doc_id(self):
-        return self.doc_id
+    def create_report(self) -> None:
+        # write a report to a text file
+        pass
 
 
 if __name__ == "__main__":
-    # need to recursively read all files in the directory
-    # directory = 'DEV'
-    # documents = []
-
-    # read documents and make the InvertedIndex
-    # json.dumps() every page in Dev :) use os most likely
-    # inverted_index = InvertedIndex()
-    # inverted_index.build_index(documents)
-    directory = 'DEV'
-    documents = []
     inverted_index = InvertedIndex()
-    LLLL = 0
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.json'):
-                LLLL += 1
-                documents.append(inverted_index.read_json(os.path.join(root, file)))
-                if LLLL % 5000 == 0:
-                    print(f'Now appended {LLLL} documents')
-
-    print(f'Total documents to search: {LLLL}')
-    inverted_index.build_index(documents)
-    inverted_index.merge_files()
-
-    exit()
+    inverted_index.create_inverted_index()
+    exit(0)
