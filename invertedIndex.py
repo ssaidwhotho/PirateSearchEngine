@@ -1,5 +1,4 @@
 # Path: invertedIndex.py
-import re
 import json
 import os
 import sys
@@ -11,7 +10,7 @@ from posting import Posting
 from bs4 import BeautifulSoup
 from hashing import sim_hash, Simhash
 
-SAVE_FREQ = 5000
+SAVE_FREQ = 10000
 
 
 def get_tokens(document) -> list:
@@ -20,7 +19,7 @@ def get_tokens(document) -> list:
         soup = BeautifulSoup(current_doc, 'xml')  # Parse the document with BeautifulSoup
         for script in soup(["script", "style"]):
             script.extract()
-        clean_text = soup.get_text()
+        clean_text = soup.get_text()  # Get the text from the document
         tokens = word_tokenize(clean_text)
         tokens = [token.lower() for token in tokens if
                   token.isalnum() or (token.replace(".", "").isalnum() and len(token) > 1)]
@@ -41,7 +40,7 @@ def get_memory_usage():
 
 class InvertedIndex:
     def __init__(self):
-        self.id = 0
+        self.id = -1
         self.hash_table = {}
         self.url_dict = {}
         self.save_files = []
@@ -71,7 +70,6 @@ class InvertedIndex:
 
     def compare_hash(self, obj: Simhash, url: str) -> bool:
         # compare the hash with the existing hashes
-        # you will do a bitwise comparison to see if they are similar and if they're similar add 1 and then divide by 64
         # if the result is greater than 0.9 then the hashes are similar
         if len(self.bits) == 0:
             self.bits.append((obj, url))
@@ -83,8 +81,7 @@ class InvertedIndex:
         self.bits.append((obj, url))
         return False
 
-    def build_index(self, documents) -> None:
-        n = -1  # Document ID
+    def build_index(self, documents: list) -> None:
         print(f"Starting to create the inverted index.")
 
         while len(documents) > 0:
@@ -95,27 +92,27 @@ class InvertedIndex:
                 # hash the tokens and create the inverted index
                 if self.compare_hash(sim_hash(tokens), document['url']):  # Check if the document is a duplicate
                     continue
-                n += 1
+                self.id += 1
                 doc_len = len(tokens)
-                self.url_dict[n] = (document['url'], doc_len)  # save the url and the length of the document idk why
+                self.url_dict[self.id] = (document['url'], doc_len)  # save the url and the length of the document
                 # we save the length though tbh
-                fields = None
+                fields = None  # TODO: get the fields from the document (bold, italic, headers, title, etc.)
 
                 for i in range(len(tokens)):  # Loop through all the tokens
                     if tokens[i] not in self.hash_table:
-                        self.hash_table[tokens[i]] = {n: Posting(n)}  # create a new token if it's a new token
-                    elif n not in self.hash_table[tokens[i]]:
-                        self.hash_table[tokens[i]][n] = Posting(n)  # create a new posting if the document is new
+                        self.hash_table[tokens[i]] = {self.id: Posting(self.id)}
+                    elif self.id not in self.hash_table[tokens[i]]:
+                        self.hash_table[tokens[i]][self.id] = Posting(self.id)
 
-                    self.hash_table[tokens[i]][n].increment()  # increment the word count
-                    self.hash_table[tokens[i]][n].add_position(i)  # add the position of the token
+                    self.hash_table[tokens[i]][self.id].increment()  # increment the word count
+                    self.hash_table[tokens[i]][self.id].add_position(i)  # add the position of the token
 
             # memory = get_memory_usage()
             # print(f"Memory usage is {memory}%")
             # if get_memory_usage() > 10:
 
             self.sort_and_save_batch()  # generate partial files
-            print(f"Finished creating inverted index for batch {n + 1}")
+            print(f"Finished creating inverted index for batch {self.id + 1}")
             self.hash_table = dict()  # clear the hash table
 
         if len(self.hash_table) > 0:
@@ -129,17 +126,17 @@ class InvertedIndex:
         # sort the hash table and save to custom txt file for seeking
         # sort the dictionary by the keys alphabetically with numbers last
         self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: (not x[0].isnumeric(), x[0])))
-        # every new line is a token and it's posting is to the right of the line
+        # every new line is a token, and it's posting is to the right of the line
         # create a new file for the batch
         with open(f'inverted_index_{self.id}.txt', 'w') as new_save_file:
             for key in self.hash_table.keys():
                 new_save_file.write(key)
-                for i in self.hash_table[key].keys():
+                for doc_id in self.hash_table[key].keys():
                     new_save_file.write(
-                        f" d{i}"  # document id
-                        f"w{self.hash_table[key][i].word_count}"  # word count
-                        f"t{self.hash_table[key][i].tfidf}"  # tf-idf
-                        f"p{self.hash_table[key][i].positions}")  # positions [list]
+                        f" d{doc_id}"  # document id
+                        f"w{self.hash_table[key][doc_id].word_count}"  # word count
+                        f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
+                        f"p{self.hash_table[key][doc_id].positions}")  # positions [list]
                 new_save_file.write("\n")
             self.save_files.append(f'inverted_index_{self.id}.txt')
 
@@ -153,7 +150,6 @@ class InvertedIndex:
 
         print("Starting to merge all files into one.")
         # open all the files!
-        sys.exit()
         # attempting multi-file merge
         file_handles = []
         for file in self.save_files:
@@ -174,24 +170,44 @@ class InvertedIndex:
 
         # merge the files
         with open('inverted_index.txt', 'w') as f:
-            while len(term_dict) > 0:
-                min_term = min(term_dict.keys())
-                f.write(min_term)
-                for i in term_dict[min_term]:
-                    f.write(lines[i].split(' ')[1])
-                    line = file_handles[i].readline()
+            while len(lines) > 0:
+                min_term = min([line.split(' ')[0] for line in lines])  # get the minimum term (alphabetically)
+                min_lines = [line for line in lines if line.split(' ')[0] == min_term]  # get all the lines with the term
+                # merge the lines
+                merged_line = min_term[0]
+                for line in min_lines:
+                    merged_line += line.split(' ')[1:]  # add the rest of the line besides the term
+                f.write(merged_line)
+                # read the next line
+                for fd in term_dict[min_term]:  # get the file descriptor
+                    line = file_handles[fd].readline() # get the next line in the files that were read
                     if line == '':
-                        term_dict.pop(min_term)
+                        lines.remove(lines[fd])
                     else:
-                        lines[i] = line
+                        lines[fd] = line
                         term = line.split(' ')[0]
                         if term not in term_dict:
                             term_dict[term] = []
-                        term_dict[term].append(i)
+                        term_dict[term].append(fd)
+                    # remove entry from term_dict list
+                    term_dict[min_term].remove(fd)
+                    if len(term_dict[min_term]) == 0:
+                        del term_dict[min_term]
 
-    def create_report(self) -> None:
-        # write a report to a text file
-        pass
+        # close all the files
+        for file in file_handles:
+            file.close()
+            os.remove(file.name)
+
+        # TODO: Make bookkeeping for indexing the inverted_index.txt file
+        # TODO: Get td-idf for each term :( so sad idk where to put that though
+        print("Saving the url dictionary.")
+        with open('url_dict.txt', 'w') as url_file:
+            for key in self.url_dict.keys():
+                url_file.write(f"{key} {self.url_dict[key][0]} {self.url_dict[key][1]}\n")
+                # format = key url length
+                # can maybe make this a json for faster lookup tbh
+        print("Finished merging all files.")
 
 
 if __name__ == "__main__":
