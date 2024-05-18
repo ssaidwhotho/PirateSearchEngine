@@ -62,7 +62,7 @@ if __name__ == "__main__":
         '/Users/samuelmallari/Documents/UCI_Spring_2024/compsci121/assignment3-stuff/url_ids.json')
 
     while True:
-        query = input("Enter a search query (or 'quit' to exit): ").lower()
+        query = input("Enter a search query (or 'quit_search' to exit): ").lower()
 
         if query == 'quit_search':
             break
