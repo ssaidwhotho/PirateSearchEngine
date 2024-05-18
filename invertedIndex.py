@@ -1,7 +1,11 @@
 # Path: invertedIndex.py
 import json
+import math
 import os
 import sys
+import time
+from urllib.parse import urldefrag
+
 import psutil
 
 from nltk.tokenize import word_tokenize
@@ -60,11 +64,18 @@ class InvertedIndex:
         :return:
         """
         documents = []
+        visited = set()
         # firstly we need to read all the documents
         for root, dirs, files in os.walk('DEV'):
             for file in files:
                 if file.endswith('.json'):
-                    documents.append(self.read_json(os.path.join(root, file)))  # read the json file
+                    document = self.read_json(os.path.join(root, file))
+                    # defrag url and check if it's a duplicate
+                    url = urldefrag(document['url']).url
+                    if url in visited:
+                        continue
+                    visited.add(url)
+                    documents.append(document)  # read the json file
 
         print(f"Total documents to search: {len(documents)}")
 
@@ -160,50 +171,88 @@ class InvertedIndex:
 
         # read a line for every file and then populate a term dictionary
         term_dict = dict()
-        lines = []
+        lines = {i: file_handles[i].readline() for i in range(len(file_handles))}
         for i in range(len(file_handles)):
-            line = file_handles[i].readline()
+            line = lines[i]
             if line == '':
-                continue
-            lines.append(line)
-            term = line.split(' ')[0]
-            if term not in term_dict:
-                term_dict[term] = []
-            term_dict[term].append(i)
+                lines.pop(i)
+            else:
+                term = line.split(' ')[0]
+                if term not in term_dict:
+                    term_dict[term] = []
+                term_dict[term].append(i)
 
         # merge the files
         with open('inverted_index.txt', 'w') as f:
             while len(lines) > 0:
-                min_term = min([line.split(' ')[0] for line in lines])  # get the minimum term (alphabetically)
-                min_lines = [line for line in lines if line.split(' ')[0] == min_term]  # get all the lines with the term
+                min_term = min(term_dict.keys())
+                min_lines = [lines[i] for i in term_dict[min_term]]
                 # merge the lines
-                merged_line = min_term[0]
+                merged_line = [min_term]
+                postings = []
                 for line in min_lines:
-                    merged_line += line.split(' ')[1:]  # add the rest of the line besides the term
+                    # create postings to get tf-idf
+                    postings.extend(line.split(' ')[1:])
+                    merged_line.extend(line.split(' ')[1:])
+
+                # calculate tf-idf
+                doc_freq = len(postings)
+                for posting in postings:
+                    # format = d{doc_id}w{word_count}t{tfidf}p{positions:list}
+                    doc_id = int(posting[1:posting.index('w')])
+                    word_count = int(posting[posting.index('w') + 1:posting.index('t')])
+                    doc_len = self.url_dict[int(doc_id)][1]
+                    total_docs = len(self.url_dict)
+                    tf = word_count / doc_len
+                    idf = 1 + math.log(total_docs / doc_freq)
+                    tfidf = tf * idf
+                    # find the t index
+                    t_index = merged_line.index(posting[posting.index('t'):])
+                    merged_line[t_index:] = f"t{tfidf}{''.join(merged_line[t_index:])}"
+                    print("new merged line", merged_line)
+
+                merged_line = ' '.join(merged_line)
+                print("this is the term", min_term)
                 f.write(merged_line)
                 # read the next line
-                for fd in term_dict[min_term]:  # get the file descriptor
-                    line = file_handles[fd].readline() # get the next line in the files that were read
-                    if line == '':
-                        lines.remove(lines[fd])
+                for i in term_dict[min_term]:
+                    lines[i] = file_handles[i].readline()
+                    if lines[i] == '':
+                        lines.pop(i)
                     else:
-                        lines[fd] = line
-                        term = line.split(' ')[0]
+                        term = lines[i].split(' ')[0]
                         if term not in term_dict:
                             term_dict[term] = []
-                        term_dict[term].append(fd)
-                    # remove entry from term_dict list
-                    term_dict[min_term].remove(fd)
-                    if len(term_dict[min_term]) == 0:
-                        del term_dict[min_term]
+                        term_dict[term].append(i)
+                term_dict.pop(min_term)
 
         # close all the files
         for file in file_handles:
             file.close()
             # os.remove(file.name)
 
-        # TODO: Make bookkeeping for indexing the inverted_index.txt file
-        # TODO: Get td-idf for each term :( so sad idk where to put that though
+        print("Creating the bookkeeping file.")
+        with open('inverted_index.txt', 'r') as f:
+            # get the first letter of the first term in each line
+            first_letters = []
+            positions = []
+            while True:
+                pos = f.tell()  # get the position of the file for seek
+                line = f.readline()  # read the line
+                if not line:
+                    break
+                first_letter = line.split(' ')[0]
+                if len(first_letter) > 0:
+                    first_letter = first_letter[0]
+                if first_letter not in first_letters:
+                    first_letters.append(first_letter)
+                    positions.append(pos)
+            # save the positions
+            with open('first_letter_positions.txt', 'w') as pos_file:
+                for i in range(len(first_letters)):
+                    pos_file.write(f"{first_letters[i]} {positions[i]}\n")
+
+
         print("Saving the url dictionary.")
         with open('url_dict.txt', 'w') as url_file:
             for key in self.url_dict.keys():
