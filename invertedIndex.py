@@ -46,6 +46,8 @@ class InvertedIndex:
         self.save_files = []
         self.bits = []
 
+        self.name = 0  # name of file
+
     @staticmethod
     def read_json(file_path) -> dict:
         # read json file directly and return the dictionary
@@ -128,7 +130,7 @@ class InvertedIndex:
         self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: (not x[0].isnumeric(), x[0])))
         # every new line is a token, and it's posting is to the right of the line
         # create a new file for the batch
-        with open(f'inverted_index_{self.id}.txt', 'w') as new_save_file:
+        with open(f'inverted_index_{self.name}.txt', 'w') as new_save_file:
             for key in self.hash_table.keys():
                 new_save_file.write(key)
                 for doc_id in self.hash_table[key].keys():
@@ -138,9 +140,10 @@ class InvertedIndex:
                         f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
                         f"p{self.hash_table[key][doc_id].positions}")  # positions [list]
                 new_save_file.write("\n")
-            self.save_files.append(f'inverted_index_{self.id}.txt')
+            self.save_files.append(f'inverted_index_{self.name}.txt')
 
         self.id += 1
+        self.name += 1
 
     def merge_files(self) -> None:
         # Merge all the files into one
@@ -197,7 +200,7 @@ class InvertedIndex:
         # close all the files
         for file in file_handles:
             file.close()
-            os.remove(file.name)
+            # os.remove(file.name)
 
         # TODO: Make bookkeeping for indexing the inverted_index.txt file
         # TODO: Get td-idf for each term :( so sad idk where to put that though
