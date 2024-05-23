@@ -13,17 +13,18 @@ def start_search_engine():
 
     token_list, pos_list, url_dict = load_bookkeeping_lists()
 
-    while True:
-        result = get_query()
-        if result.lower() == "exit":
-            break
-        if result.lower().startswith("error: "):
-            print(result)
-            continue
+    with open("inverted_index.txt", "r") as f:
+        while True:
+            result = get_query()
+            if result.lower() == "exit":
+                break
+            if result.lower().startswith("error: "):
+                print(result)
+                continue
 
-        print("(TESTING) Query: ", result)
-        result = run_query(result, token_list, pos_list)
-        print_results(result, url_dict)
+            print("(TESTING) Query: ", result)
+            result = run_query(f, result, token_list, pos_list)
+            print_results(result, url_dict)
 
     print("Search engine closing, Goodbye!")
 
@@ -52,6 +53,8 @@ def load_bookkeeping_lists() -> tuple:
     pos_list = []
     with open("token_positions_list.txt", "r") as f:
         for line in f:
+            if line[0] == ":" or line == "\n": #Shouldn't be necessary, but an easy precaution
+                continue
             token, pos = line.split(":")
             token_list.append(token)
             pos_list.append(pos)
@@ -87,7 +90,7 @@ def get_query() -> str: #TODO: Replace with the GUI
     return query
 
 
-def run_query(query: str, token_list: list, pos_list: list) -> list:
+def run_query(f, query: str, token_list: list, pos_list: list) -> list:
     """This function will run the query and return the results."""
     # Start timer here
     start_time = time.time()
@@ -103,7 +106,7 @@ def run_query(query: str, token_list: list, pos_list: list) -> list:
         # Get the index of the token in the token list
         index = binary_search(token_list, token)
         if index == -1:
-            print(f"Token '{token}' not found in the index.")
+            print(f"(TESTING) Token '{token}' not found in the index.")
             q_tokens.remove(token)
             continue
         q_pos.append(pos_list[index])
@@ -112,30 +115,41 @@ def run_query(query: str, token_list: list, pos_list: list) -> list:
     # Step 4: Rank the documents based on the query
     doc_rankings = {}
     sorted_rankings = []
-    with open("inverted_index.txt", "r") as f:
-        for i, pos in enumerate(q_pos):
-            f.seek(int(pos))
+    for i, pos in enumerate(q_pos):
+        f.seek(int(pos))
+
+        ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
+        testing_line = f.readline()
+        while True:
             line = f.readline()
-            lines = line.split(' ')
-            if lines[0] != q_tokens[i]:
-                print(f"Error: Expected token '{q_tokens[i]}' but got '{lines[0]}'")
-                continue
-            postings = decode_postings(lines[1:])
+            if line[0] != ' ' or line[1] == ":":
+                break
+            print('(TESTING) adding another line')
+            testing_line += line
+        line = testing_line
+        ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
 
-            for post in postings:
-                doc_id, word_count, tfidf, positions = post
-                if doc_id in doc_rankings:
-                    doc_rankings[doc_id] += float(tfidf)
-                else:
-                    doc_rankings[doc_id] = float(tfidf)
+        #line = f.readline() #TODO: Get rid of above testing code, uncomment this line
+        lines = line.split(' ')
+        if lines[0] != q_tokens[i]:
+            print(f"Error: Expected token '{q_tokens[i]}' but got '{lines[0]}'")
+            continue
+        postings = decode_postings(lines[1:])
 
-            for key in sorted(doc_rankings, key = doc_rankings.get):
-                sorted_rankings.append(key)
+        for post in postings:
+            doc_id, word_count, tfidf, positions = post
+            if doc_id in doc_rankings:
+                doc_rankings[doc_id] += float(tfidf)
+            else:
+                doc_rankings[doc_id] = float(tfidf)
+
+        for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
+            sorted_rankings.append(key)
 
 
     # End timer here
     end_time = time.time()
-    print(f"{len(sorted_rankings)} results found in {end_time - start_time:.4f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+    print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
     # Step 5: Return the top documents in order
     return sorted_rankings

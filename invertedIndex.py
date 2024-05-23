@@ -61,12 +61,12 @@ class InvertedIndex:
                     visited.add(url)
                     documents.append(document)  # read the json file
 
-                if len(documents) % 1000 == 0:
+                if len(documents) % 2500 == 0:
                     print(F"At {len(documents)} added.")
-                    #if len(documents) > 2000:
-                        #break  # TODO: Remove this
-            #if len(documents) > 2000:
-                #break  # TODO: Remove this
+            #        if len(documents) > 3999:
+            #            break  # TODO: Remove this
+            #if len(documents) > 3999:
+            #    break  # TODO: Remove this
 
         print(f"Total documents to search: {len(documents)}")
 
@@ -80,25 +80,29 @@ class InvertedIndex:
             return False
         for other_hash in self.bits:
             if obj.similarity(other_hash[0]) >= 0.9:
-                # print(f"Document {url} is a duplicate of {other_hash[1]}. Skipping.")
+                #print(f"Document {url} is a duplicate of {other_hash[1]}. Skipping.")
                 return True
         self.bits.append((obj, url))
         return False
 
     def build_index(self, documents: list) -> None:
         print(f"Starting to create the inverted index.")
-
+        skipped_documents = 0
         while len(documents) > 0:
             batch = documents[:SAVE_FREQ]  # Get the first 1000 documents
             documents = documents[SAVE_FREQ:]  # Remove the first 1000 documents
             for document in batch:
                 tokens = tokenizer.get_tokens(document)
                 # hash the tokens and create the inverted index
-                if self.compare_hash(sim_hash(tokens), document['url']):  # Check if the document is a duplicate
+                if len(tokens) < 30 or self.compare_hash(sim_hash(tokens), document['url']):  # Check if the document is a duplicate
+                    skipped_documents += 1
                     continue
                 self.id += 1
+                if self.id % 2500 == 0:
+                    print(F"At {self.id} added. {skipped_documents} skipped. About {len(documents)} remaining.")
                 doc_len = len(tokens)
                 self.url_dict[self.id] = (document['url'], doc_len)  # save the url and the length of the document
+
                 # we save the length though tbh
                 fields = None  # TODO: get the fields from the document (bold, italic, headers, title, etc.)
 
@@ -124,6 +128,7 @@ class InvertedIndex:
             self.hash_table = dict()
 
         print("Finished creating the inverted index now merging files.")
+        print(f"Skipped {skipped_documents} documents.")
         self.merge_files()
 
     def sort_and_save_batch(self) -> None:
@@ -233,6 +238,8 @@ class InvertedIndex:
                 line = f.readline()  # read the line
                 if not line:
                     break
+                if line[0] == " ":  #TODO: Fix the inverted index then remove this
+                    continue
                 word = line.split(' ')[0]
                 token_list.append(word)
                 token_pos_list.append(pos)
