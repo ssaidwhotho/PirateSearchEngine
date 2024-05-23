@@ -1,4 +1,5 @@
 from invertedIndex import InvertedIndex
+import query
 
 
 def main() -> None:
@@ -8,8 +9,9 @@ def main() -> None:
     #     print("Finished creating the inverted index.")
     index = InvertedIndex()
     index.create_inverted_index()
-
     print("Finished creating the inverted index.")
+
+    query.start_search_engine()
     return
 
 

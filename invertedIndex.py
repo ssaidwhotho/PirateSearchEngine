@@ -5,46 +5,17 @@ import os
 import sys
 import time
 from urllib.parse import urldefrag
+import tokenizer
 
 import psutil
 
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
 from posting import Posting
-from bs4 import BeautifulSoup
 from hashing import sim_hash, Simhash
 
 SAVE_FREQ = 10000
 
 
-def is_alphanumeric(token: str) -> bool:
-    # Check if the token is alphanumeric
-    for char in token:
-        if char.lower() not in "abcdefghijklmnopqrstuvwxyz0123456789":
-            return False
-    return True
 
-def get_tokens(document) -> list:
-    try:
-        current_doc = document['content']  # Copy current document
-        soup = BeautifulSoup(current_doc, 'xml')  # Parse the document with BeautifulSoup
-        for script in soup(["script", "style"]):
-            script.extract()
-        clean_text = soup.get_text()  # Get the text from the document
-        tokens = word_tokenize(clean_text)
-
-        tokens = [token.lower() for token in tokens if
-                  is_alphanumeric(token) or (is_alphanumeric(token.replace(".", "")) and len(token) > 1)]
-        p_stemmer = PorterStemmer()
-        tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
-        # bigram_tokens = []
-        # for i in range(len(tokens) - 1):
-        #     bigram_tokens.append(tokens[i] + " " + tokens[i + 1])
-        return tokens #, bigram_tokens
-    except Exception as e:
-        print(document['content'])
-        print(f"Error: {e}")
-        return []
 
 
 def get_memory_usage():
@@ -121,7 +92,7 @@ class InvertedIndex:
             batch = documents[:SAVE_FREQ]  # Get the first 1000 documents
             documents = documents[SAVE_FREQ:]  # Remove the first 1000 documents
             for document in batch:
-                tokens = get_tokens(document)
+                tokens = tokenizer.get_tokens(document)
                 # hash the tokens and create the inverted index
                 if self.compare_hash(sim_hash(tokens), document['url']):  # Check if the document is a duplicate
                     continue
@@ -230,10 +201,10 @@ class InvertedIndex:
                     t_index = merged_line.index(posting)
                     new_posting = posting[:posting.index('t')] + f"t{tfidf:.4f}{''.join(posting[posting.index('t')+2:])}"
                     merged_line[t_index] = new_posting
-                    print("new merged line", merged_line)
+                    #print("new merged line", merged_line)
 
                 merged_line = ' '.join(merged_line)
-                print("this is the term", min_term)
+                #print("this is the term", min_term)
                 f.write(merged_line)
                 # read the next line
                 for i in term_dict[min_term]:
@@ -250,28 +221,25 @@ class InvertedIndex:
         # close all the files
         for file in file_handles:
             file.close()
-            # os.remove(file.name)
+            os.remove(file.name)
 
         print("Creating the bookkeeping file.")
         with open('inverted_index.txt', 'r') as f:
-            # get the first letter of the first term in each line
-            first_letters = []
-            positions = []
+            # get the positions of each token
+            token_list = []
+            token_pos_list = []
             while True:
                 pos = f.tell()  # get the position of the file for seek
                 line = f.readline()  # read the line
                 if not line:
                     break
-                first_letter = line.split(' ')[0]
-                if len(first_letter) > 0:
-                    first_letter = first_letter[0]
-                if first_letter not in first_letters:
-                    first_letters.append(first_letter)
-                    positions.append(pos)
+                word = line.split(' ')[0]
+                token_list.append(word)
+                token_pos_list.append(pos)
             # save the positions
-            with open('first_letter_positions.txt', 'w') as pos_file:
-                for i in range(len(first_letters)):
-                    pos_file.write(f"{first_letters[i]} {positions[i]}\n")
+            with open('token_positions_list.txt', 'w') as pos_file:
+                for i in range(len(token_list)):
+                    pos_file.write(f"{token_list[i]}:{token_pos_list[i]}\n")
 
 
         print("Saving the url dictionary.")
