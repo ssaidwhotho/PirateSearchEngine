@@ -9,6 +9,7 @@ def is_alphanumeric(token: str) -> bool:
             return False
     return True
 
+
 def get_tokens(document) -> list:
     try:
         current_doc = document['content']  # Copy current document
