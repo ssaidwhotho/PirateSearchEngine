@@ -135,7 +135,7 @@ def run_query(query: str, token_list: list, pos_list: list) -> list:
 
     # End timer here
     end_time = time.time()
-    print(f"Query took {end_time - start_time:.4f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+    print(f"{len(sorted_rankings)} results found in {end_time - start_time:.4f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
     # Step 5: Return the top documents in order
     return sorted_rankings

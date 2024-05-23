@@ -61,12 +61,12 @@ class InvertedIndex:
                     visited.add(url)
                     documents.append(document)  # read the json file
 
-                if len(documents) % 100 == 0:
+                if len(documents) % 1000 == 0:
                     print(F"At {len(documents)} added.")
-                    if len(documents) > 300:
-                        break  # TODO: Remove this
-            if len(documents) > 300:
-                break  # TODO: Remove this
+                    #if len(documents) > 2000:
+                        #break  # TODO: Remove this
+            #if len(documents) > 2000:
+                #break  # TODO: Remove this
 
         print(f"Total documents to search: {len(documents)}")
 
