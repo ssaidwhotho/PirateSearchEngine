@@ -25,3 +25,12 @@ class Posting:
 
     def add_position(self, position):
         self.positions.append(position)
+
+    def get_positions_str(self):
+        if len(self.positions) == 0:
+            return ""
+
+        pos_str = ""
+        for p in self.positions:
+            pos_str += str(p) + ","
+        return "[" + pos_str[:-1] + "]"

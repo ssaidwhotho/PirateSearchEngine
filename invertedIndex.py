@@ -17,6 +17,13 @@ from hashing import sim_hash, Simhash
 SAVE_FREQ = 10000
 
 
+def is_alphanumeric(token: str) -> bool:
+    # Check if the token is alphanumeric
+    for char in token:
+        if char.lower() not in "abcdefghijklmnopqrstuvwxyz0123456789":
+            return False
+    return True
+
 def get_tokens(document) -> list:
     try:
         current_doc = document['content']  # Copy current document
@@ -25,11 +32,15 @@ def get_tokens(document) -> list:
             script.extract()
         clean_text = soup.get_text()  # Get the text from the document
         tokens = word_tokenize(clean_text)
+
         tokens = [token.lower() for token in tokens if
-                  token.isalnum() or (token.replace(".", "").isalnum() and len(token) > 1)]
+                  is_alphanumeric(token) or (is_alphanumeric(token.replace(".", "")) and len(token) > 1)]
         p_stemmer = PorterStemmer()
         tokens = [p_stemmer.stem(word) for word in tokens]  # Stem using PorterStemmer
-        return tokens
+        # bigram_tokens = []
+        # for i in range(len(tokens) - 1):
+        #     bigram_tokens.append(tokens[i] + " " + tokens[i + 1])
+        return tokens #, bigram_tokens
     except Exception as e:
         print(document['content'])
         print(f"Error: {e}")
@@ -65,6 +76,8 @@ class InvertedIndex:
         """
         documents = []
         visited = set()
+
+        print(f"Starting to create the inverted index.")
         # firstly we need to read all the documents
         for root, dirs, files in os.walk('DEV'):
             for file in files:
@@ -76,6 +89,13 @@ class InvertedIndex:
                         continue
                     visited.add(url)
                     documents.append(document)  # read the json file
+
+                if len(documents) % 100 == 0:
+                    print(F"At {len(documents)} added.")
+                    if len(documents) > 300:
+                        break  # TODO: Remove this
+            if len(documents) > 300:
+                break  # TODO: Remove this
 
         print(f"Total documents to search: {len(documents)}")
 
@@ -111,7 +131,7 @@ class InvertedIndex:
                 # we save the length though tbh
                 fields = None  # TODO: get the fields from the document (bold, italic, headers, title, etc.)
 
-                for i in range(len(tokens)):  # Loop through all the tokens
+                for i in range(doc_len):  # Loop through all the tokens
                     if tokens[i] not in self.hash_table:
                         self.hash_table[tokens[i]] = {self.id: Posting(self.id)}
                     elif self.id not in self.hash_table[tokens[i]]:
@@ -149,7 +169,7 @@ class InvertedIndex:
                         f" d{doc_id}"  # document id
                         f"w{self.hash_table[key][doc_id].word_count}"  # word count
                         f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
-                        f"p{self.hash_table[key][doc_id].positions}")  # positions [list]
+                        f"p{self.hash_table[key][doc_id].get_positions_str()}")  # positions [list]
                 new_save_file.write("\n")
             self.save_files.append(f'inverted_index_{self.name}.txt')
 
@@ -197,18 +217,19 @@ class InvertedIndex:
 
                 # calculate tf-idf
                 doc_freq = len(postings)
+                total_docs = len(self.url_dict)
                 for posting in postings:
                     # format = d{doc_id}w{word_count}t{tfidf}p{positions:list}
                     doc_id = int(posting[1:posting.index('w')])
                     word_count = int(posting[posting.index('w') + 1:posting.index('t')])
                     doc_len = self.url_dict[int(doc_id)][1]
-                    total_docs = len(self.url_dict)
                     tf = word_count / doc_len
                     idf = 1 + math.log(total_docs / doc_freq)
                     tfidf = tf * idf
                     # find the t index
-                    t_index = merged_line.index(posting[posting.index('t'):])
-                    merged_line[t_index:] = f"t{tfidf}{''.join(merged_line[t_index:])}"
+                    t_index = merged_line.index(posting)
+                    new_posting = posting[:posting.index('t')] + f"t{tfidf:.4f}{''.join(posting[posting.index('t')+2:])}"
+                    merged_line[t_index] = new_posting
                     print("new merged line", merged_line)
 
                 merged_line = ' '.join(merged_line)
