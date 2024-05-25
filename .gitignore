@@ -8,3 +8,7 @@ test.py
 url_ids.json
 DEV
 index_runs
+.idea/misc.xml
+.DS_Store
+.idea/misc.xml
+DEV/.DS_Store
