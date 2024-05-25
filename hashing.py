@@ -66,7 +66,7 @@ def sim_hash(text: list) -> Simhash:
     """
     This function will take in a list of words and return the sim-hash of the document list.
     :param text: list
-    :return: str
+    :return: Simhash
     """
     # Create a Simhash object
     simhash = Simhash()
