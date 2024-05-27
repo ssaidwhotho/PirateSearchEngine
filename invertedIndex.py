@@ -267,27 +267,27 @@ if __name__ == "__main__":
     inverted_index = InvertedIndex()
     inverted_index.create_inverted_index()
     # TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index creation with Adam's info
-    # documents = []
-    # documents_read = 0
-    # with open("url_dict.txt", 'r') as f:
-    #     # find the document[url] that matches with the url and populate a list of docs
-    #     document_dict = {}
-    #     for root, dirs, files in os.walk('DEV'):
-    #         for file in files:
-    #             if file.endswith('.json'):
-    #                 document = inverted_index.read_json(os.path.join(root, file))
-    #                 document_dict[document['url']] = document
-    #     print("reading the url_dict.txt file.")
-    #     for line in f:
-    #         doc_id, url, doc_len = line.split(' ')
-    #         # now look through dev folder to find the document
-    #         if url in document_dict:
-    #             documents.append(document_dict[url])
-    #             documents_read += 1
-    #         if documents_read % 2500 == 0:
-    #             print(f"Read {documents_read} documents.")
-    #     document_dict = {}
-    #
-    # print("read all the documents.")
-    # inverted_index.build_index(documents)
+    documents = []
+    documents_read = 0
+    with open("url_dict.txt", 'r') as f:
+        # find the document[url] that matches with the url and populate a list of docs
+        document_dict = {}
+        for root, dirs, files in os.walk('DEV'):
+            for file in files:
+                if file.endswith('.json'):
+                    document = inverted_index.read_json(os.path.join(root, file))
+                    document_dict[document['url']] = document
+        print("reading the url_dict.txt file.")
+        for line in f:
+            doc_id, url, doc_len = line.split(' ')
+            # now look through dev folder to find the document
+            if url in document_dict:
+                documents.append(document_dict[url])
+                documents_read += 1
+            if documents_read % 2500 == 0:
+                print(f"Read {documents_read} documents.")
+        document_dict = {}
+
+    print("read all the documents.")
+    inverted_index.build_index(documents)
     exit(0)
