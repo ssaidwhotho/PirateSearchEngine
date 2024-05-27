@@ -5,6 +5,9 @@ import os
 import sys
 import time
 from urllib.parse import urldefrag
+
+from bs4 import BeautifulSoup
+
 import tokenizer
 
 import psutil
@@ -13,6 +16,7 @@ from posting import Posting
 from hashing import sim_hash, Simhash
 
 SAVE_FREQ = 10000
+DAMPING_FACTOR = 0.85
 
 
 class InvertedIndex:
@@ -45,22 +49,19 @@ class InvertedIndex:
             for file in files:
                 if file.endswith('.json'):
                     document = self.read_json(os.path.join(root, file))
-                    if len(document['content']) < 30:
+                    words = BeautifulSoup(document['content'], 'html.parser').get_text()
+                    if len(words) < 30:  # less than 30 words, skip
                         skipped_documents += 1
                         continue
-                    sim_hashes_so_far.append((sim_hash(tokenizer.tokenize(document['content'])), document))
+                    sim_hashes_so_far.append((sim_hash(tokenizer.tokenize(words)), document))
                     if len(sim_hashes_so_far) % 1000 == 0:
                         print(f"Read {len(sim_hashes_so_far)} documents.")
 
         # now compare and populate document list
         # O(n^2) but it's fine i hope
         for i in range(len(sim_hashes_so_far)):
-            for j in range(i + 1, len(sim_hashes_so_far)):
-                if self.compare_hash(sim_hashes_so_far[i][0], sim_hashes_so_far[j][1]['url']):
-                    skipped_documents += 1
-                    break
-            if i % 1000 == 0:
-                print(f"Compared {i} documents.")
+            if self.compare_hash(sim_hashes_so_far[i][0], sim_hashes_so_far[i][1]['url']):
+                continue
             documents.append(sim_hashes_so_far[i][1])
 
         print(f"Finished reading all documents.")
@@ -264,7 +265,7 @@ class InvertedIndex:
 
 if __name__ == "__main__":
     inverted_index = InvertedIndex()
-    # inverted_index.create_inverted_index()
+    inverted_index.create_inverted_index()
     # TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index creation with Adam's info
     # documents = []
     # documents_read = 0
