@@ -2,16 +2,9 @@
 import json
 import math
 import os
-import sys
-import time
-from urllib.parse import urldefrag
-
-from bs4 import BeautifulSoup
-
 import tokenizer
 
-import psutil
-
+from bs4 import BeautifulSoup
 from posting import Posting
 from hashing import sim_hash, Simhash
 
@@ -26,6 +19,7 @@ class InvertedIndex:
         self.url_dict = {}
         self.save_files = []
         self.bits = []
+        self.page_rank = {}
 
         self.name = 0  # name of file
 
@@ -112,7 +106,24 @@ class InvertedIndex:
                         self.hash_table[token][self.id].tfidf += 1
 
                 for hyper_links in links:
-                    if hyper_links[0] in self.url_dict.values():
+                    # get the id of the link and do page rank
+                    link_id = -1
+                    for key in self.url_dict.keys():
+                        if self.url_dict[key][0] == hyper_links[0]:
+                            link_id = key
+                            break
+                    if link_id == -1:
+                        # link not found
+                        continue
+                    else:
+                        if self.id not in self.page_rank:
+                            self.page_rank[self.id] = [link_id]
+                        else:
+                            self.page_rank[self.id].append(link_id)
+                        if link_id not in self.page_rank:
+                            self.page_rank[link_id] = [self.id]
+                        else:
+                            self.page_rank[link_id].append(self.id)
                         # tokenize the text
                         tokens = tokenizer.tokenize(hyper_links[1])
                         for token in tokens:
@@ -134,7 +145,35 @@ class InvertedIndex:
 
         print("Finished creating the inverted index now merging files.")
         print(f"Skipped {skipped_documents} documents.")
+        self.create_page_ranks()
         self.merge_files()
+
+    def create_page_ranks(self) -> None:
+        """Gives the iterative page ranks for the documents."""
+        print("Starting to create the page ranks.")
+        # Initialize the page rank values
+        page_rank = {key: 1 / len(self.url_dict) for key in self.url_dict.keys()}
+        print("Initialized the page ranks.")
+
+        # update the page rank values, 30 iterations
+        for i in range(30):
+            new_page_rank = {}
+            for key in page_rank.keys():
+                new_page_rank[key] = (1 - DAMPING_FACTOR) / len(self.url_dict)
+                if key in self.page_rank:
+                    for link in self.page_rank[key]:
+                        new_page_rank[key] += DAMPING_FACTOR * page_rank[link] / len(self.page_rank[link])
+            # normalize the page rank values
+            total = sum(new_page_rank.values())
+            new_page_rank = {key: value / total for key, value in new_page_rank.items()}
+            page_rank = new_page_rank
+
+        # save the page rank values
+        with open('page_rank.txt', 'w') as f:
+            for key in page_rank.keys():
+                f.write(f"{key} {page_rank[key]}\n")
+        print("Finished creating the page ranks.")
+        self.page_rank = {}
 
     def sort_and_save_batch(self) -> None:
         # sort the hash table and save to custom txt file for seeking
@@ -244,8 +283,6 @@ class InvertedIndex:
                 line = f.readline()  # read the line
                 if not line:
                     break
-                if line[0] == " ":  #TODO: Fix the inverted index then remove this
-                    continue
                 word = line.split(' ')[0]
                 token_list.append(word)
                 token_pos_list.append(pos)
@@ -265,7 +302,7 @@ class InvertedIndex:
 
 if __name__ == "__main__":
     inverted_index = InvertedIndex()
-    inverted_index.create_inverted_index()
+    # inverted_index.create_inverted_index()
     # TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index creation with Adam's info
     # documents = []
     # documents_read = 0

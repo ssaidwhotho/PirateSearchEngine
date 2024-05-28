@@ -42,9 +42,10 @@ def get_tokens(document) -> dict and list[tuple]:
         for link in soup.find_all('a'):
             hyperlinks.append((link.get('href'), link.text))
         # find title and bold tags
-        titles = soup.find('title') if soup.find('title') else []
-        bold = soup.find('strong') if soup.find('strong') else []
-        bold2 = soup.find('b') if soup.find('b') else []
+        titles = tokenize(" ".join(tag.get_text() for tag in soup.find_all('title') if tag.get_text()))
+        bold = tokenize(" ".join(tag.get_text() for tag in soup.find_all('b') if tag.get_text()))
+        bold2 = tokenize(" ".join(tag.get_text() for tag in soup.find_all('strong') if tag.get_text()))
+        # tokenize the text for the tags
         clean_text = soup.get_text()  # Get the text from the document
         tokens = tokenize(clean_text)  # Tokenize the text
         token_dict = {}  # Create a dictionary to store the tokens
