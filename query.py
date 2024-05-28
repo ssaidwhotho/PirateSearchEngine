@@ -118,18 +118,18 @@ def run_query(f, query: str, token_list: list, pos_list: list) -> list:
     for i, pos in enumerate(q_pos):
         f.seek(int(pos))
 
-        ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
-        testing_line = f.readline()
-        while True:
-            line = f.readline()
-            if line[0] != ' ' or line[1] == ":":
-                break
-            print('(TESTING) adding another line')
-            testing_line += line
-        line = testing_line
-        ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
+        # ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
+        # testing_line = f.readline()
+        # while True:
+        #     line = f.readline()
+        #     if line[0] != ' ' or line[1] == ":":
+        #         break
+        #     print('(TESTING) adding another line')
+        #     testing_line += line
+        # line = testing_line
+        # ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
 
-        #line = f.readline() #TODO: Get rid of above testing code, uncomment this line
+        line = f.readline() #TODO: Get rid of above testing code, uncomment this line
         lines = line.split(' ')
         if lines[0] != q_tokens[i]:
             print(f"Error: Expected token '{q_tokens[i]}' but got '{lines[0]}'")
