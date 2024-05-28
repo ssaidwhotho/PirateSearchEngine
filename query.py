@@ -64,7 +64,13 @@ def load_bookkeeping_lists() -> tuple:
         for line in f:
             doc_id, url, doc_size = line.split(" ")
             url_dict[doc_id] = url
-    return token_list, pos_list, url_dict
+
+    page_rank = {}
+    with open("page_rank.txt", "r") as f:
+        for line in f:
+            doc_id, rank = line.split(" ")
+            page_rank[doc_id] = float(rank)
+    return token_list, pos_list, url_dict, page_rank
 
 
 def print_results(result: list, url_dict: dict) -> None:

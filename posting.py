@@ -2,7 +2,7 @@ import math
 
 
 class Posting:
-    def __init__(self, doc_id, word_count=0, tfidf=0, positions=None):
+    def __init__(self, doc_id, word_count=0, tfidf=0.0, positions=None):
 
         if positions is None:
             positions = []

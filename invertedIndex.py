@@ -101,9 +101,11 @@ class InvertedIndex:
                     self.hash_table[token][self.id].word_count = tokens[token][0]
                     self.hash_table[token][self.id].positions = tokens[token][3]
                     if tokens[token][1]:
-                        self.hash_table[token][self.id].tfidf += 2
+                        # title
+                        self.hash_table[token][self.id].tfidf += float(5)
                     if tokens[token][2]:
-                        self.hash_table[token][self.id].tfidf += 1
+                        # bold
+                        self.hash_table[token][self.id].tfidf += float(1.5)
 
                 for hyper_links in links:
                     # get the id of the link and do page rank
@@ -127,12 +129,13 @@ class InvertedIndex:
                         # tokenize the text
                         tokens = tokenizer.tokenize(hyper_links[1])
                         for token in tokens:
+                            # hyperlink words
                             if token not in self.hash_table:
                                 self.hash_table[token] = {self.id: Posting(self.id)}
                             elif self.id not in self.hash_table[token]:
                                 self.hash_table[token][self.id] = Posting(self.id)
 
-                            self.hash_table[token][self.id].tfidf += 3
+                            self.hash_table[token][self.id].tfidf += float(1.5)
 
             # save the batch to a file
             self.sort_and_save_batch()  # generate partial files
@@ -155,8 +158,8 @@ class InvertedIndex:
         page_rank = {key: 1 / len(self.url_dict) for key in self.url_dict.keys()}
         print("Initialized the page ranks.")
 
-        # update the page rank values, 30 iterations
-        for i in range(30):
+        # update the page rank values, 20 iterations
+        for i in range(20):
             new_page_rank = {}
             for key in page_rank.keys():
                 new_page_rank[key] = (1 - DAMPING_FACTOR) / len(self.url_dict)
@@ -245,12 +248,12 @@ class InvertedIndex:
                     tf = word_count / doc_len
                     idf = 1 + math.log(total_docs / doc_freq)
                     tfidf = tf * idf
-                    # find the t index
+                    # find the t index which is the document to update
                     t_index = merged_line.index(posting)
                     # get the tfidf value saved in the posting
                     old_tfidf = float(posting[posting.index('t') + 1:posting.index('p')])
-                    new_posting = (posting[:posting.index('t')] +
-                                   f"t{tfidf + old_tfidf:.4f}{''.join(posting[posting.index('t') + 2:])}")
+                    print(f"Old tfidf: {old_tfidf}")
+                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}p{posting[posting.index('p'):]}"
                     merged_line[t_index] = new_posting
                 merged_line = ' '.join(merged_line)
                 # take out all the new lines

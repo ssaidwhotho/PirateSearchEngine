@@ -34,7 +34,7 @@ def get_tokens(document) -> dict and list[tuple]:
     """
     try:
         current_doc = document['content']  # Copy current document
-        soup = BeautifulSoup(current_doc, 'html.parser')  # Parse the document
+        soup = BeautifulSoup(current_doc, 'lxml')  # Parse the document
         for script in soup(["script", "style"]):
             script.extract()
         # find all hyperlinks and their anchor text
