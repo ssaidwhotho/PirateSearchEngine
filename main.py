@@ -10,9 +10,11 @@ def main() -> None:
     #index = InvertedIndex()
     #index.create_inverted_index()
     #print("Finished creating the inverted index.")
-    query.start_search_engine()
     #find_most_common_words()
     #find_highest_tfidf()
+    #find_highest_pagerank()
+    the_search_engine = query.search_engine()
+    the_search_engine.start_search_engine()
     return
 
 
@@ -31,6 +33,25 @@ def find_highest_tfidf():
         highest_tfidf.sort(key = lambda a: a[1], reverse = True)
         with open("highest_tfidf.txt", "w") as f:
             for token, tfidf in highest_tfidf:
+                f.write(f"{token}: {tfidf}\n")
+
+
+def find_highest_pagerank():
+    with open("page_rank.txt", "r") as f:
+        highest_pg = []
+        for line in f:
+            if line[0] == ":" or line == "\n":
+                continue
+            lines = line.split(' ')
+            token = lines[0]
+            pg = float(lines[1])
+            print(token, pg)
+            highest_pg.append((token, pg))
+
+
+        highest_pg.sort(key = lambda a: a[1], reverse = True)
+        with open("highest_pagerank.txt", "w") as f:
+            for token, tfidf in highest_pg:
                 f.write(f"{token}: {tfidf}\n")
 
 
