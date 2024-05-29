@@ -3,8 +3,8 @@ from pathlib import Path
 import time
 import os
 
-PAGERANK_WEIGHT = 0.3  #0-1, 0 = only tfidf, 1 = only pagerank
-
+PAGERANK_WEIGHT = 0.3  # 0-1, 0 = only tfidf, 1 = only pagerank
+PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 
 class search_engine:
     """This class will run the search engine."""
@@ -17,6 +17,7 @@ class search_engine:
 
         self.pagerank_weight = PAGERANK_WEIGHT
         self.tfidf_weight = 1 - PAGERANK_WEIGHT
+        self.proximity_weight = PROXIMITY_WEIGHT
 
         self.token_list = []
         self.pos_list = []
@@ -96,6 +97,18 @@ class search_engine:
         # Step 2: Parse the query
         q_tokens = tokenizer.tokenize(query)
 
+        # Step 2.5: Remove any duplicate tokens, save positions
+        duplicate_tokens = {}
+        for i in range(len(q_tokens)):
+            if q_tokens[i] in q_tokens[:i]:
+                distance = i - q_tokens[:i].index(q_tokens[i])
+                if q_tokens[i] in duplicate_tokens:
+                    duplicate_tokens[q_tokens[i]].append(distance)
+                else:
+                    duplicate_tokens[q_tokens[i]] = [distance]
+                q_tokens.pop(i)
+                i -= 1
+
         # Step 3: Get the postings list for each term in the query
         q_pos = []
         q_tokens_copy = q_tokens.copy()
@@ -113,7 +126,6 @@ class search_engine:
                 continue
             q_pos.append(self.pos_list[index])
 
-
         # Step 4: Rank the documents based on the query
         doc_rankings = {}
         sorted_rankings = []
@@ -122,18 +134,30 @@ class search_engine:
 
             line = f.readline()
             lines = line.split(' ')
+            token = lines[0]
             if lines[0] != q_tokens[i]:
                 print(f"Error: Expected token '{q_tokens[i]}' but got '{lines[0]}'")
                 continue
+            multiplier = 1
+            if token in duplicate_tokens:
+                multiplier += len(duplicate_tokens[token])
             postings = decode_postings(lines[1:])
 
             for post in postings:
                 doc_id, word_count, tfidf, positions = post
                 tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf
+
+                proximity_multiplier = 1
+                last_change = 1
+                for j in range(multiplier-1):
+                    for n in range(check_distance(positions, duplicate_tokens[token][j])):
+                        last_change = last_change * self.proximity_weight
+                        proximity_multiplier += last_change
+
                 if doc_id in doc_rankings:
-                    doc_rankings[doc_id] += tfidf
+                    doc_rankings[doc_id] += tfidf * multiplier * proximity_multiplier
                 else:
-                    doc_rankings[doc_id] = tfidf
+                    doc_rankings[doc_id] = tfidf * multiplier * proximity_multiplier
 
         for doc_id in doc_rankings:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
@@ -183,6 +207,7 @@ def decode_postings(postings: list) -> list:
         tfidf, positions = other.split("p")
         tfidf = float(tfidf)
         positions = positions[1:-1].split(",")
+        positions = [int(pos) for pos in positions]
         decoded.append((doc_id, word_count, tfidf, positions))
     return decoded
 
@@ -236,5 +261,19 @@ def get_query() -> str: #TODO: Replace with the GUI
         return "ERROR: Query cannot be empty."
     return query
 
+
+def check_distance(word_positions: list, distance: int) -> int:
+    word_positions.sort()
+    count = 0
+
+    # Iterate through the list, checking the distance between each pair of words
+    for i in range(len(word_positions)):
+        j = i + 1
+        while j < len(word_positions) and word_positions[j] - word_positions[i] <= distance:
+            if word_positions[j] - word_positions[i] == distance:
+                count += 1
+            j += 1
+
+    return count
 
 
