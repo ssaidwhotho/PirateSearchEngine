@@ -91,7 +91,8 @@ class InvertedIndex:
                 tokens, links = tokenizer.get_tokens(document)
                 # hash the tokens and create the inverted index
                 self.id += 1
-                self.url_dict[self.id] = (document['url'], len(tokens))
+                total_words = sum(tokens[token][0] for token in tokens.keys())
+                self.url_dict[self.id] = (document['url'], total_words)
                 for token in tokens.keys():
                     if token not in self.hash_table:
                         self.hash_table[token] = {self.id: Posting(self.id)}
