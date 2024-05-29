@@ -11,7 +11,7 @@ def start_search_engine():
         print("Search engine closing, Goodbye!")
         exit(1)
 
-    token_list, pos_list, url_dict = load_bookkeeping_lists()
+    token_list, pos_list, url_dict, page_rank = load_bookkeeping_lists()
 
     with open("inverted_index.txt", "r") as f:
         while True:
@@ -23,7 +23,7 @@ def start_search_engine():
                 continue
 
             print("(TESTING) Query: ", result)
-            result = run_query(f, result, token_list, pos_list)
+            result = run_query(f, result, token_list, pos_list, page_rank)
             print_results(result, url_dict)
 
     print("Search engine closing, Goodbye!")
@@ -96,7 +96,7 @@ def get_query() -> str: #TODO: Replace with the GUI
     return query
 
 
-def run_query(f, query: str, token_list: list, pos_list: list) -> list:
+def run_query(f, query: str, token_list: list, pos_list: list, page_rank:dict) -> list:
     """This function will run the query and return the results."""
     # Start timer here
     start_time = time.time()
@@ -110,6 +110,11 @@ def run_query(f, query: str, token_list: list, pos_list: list) -> list:
     q_tokens_copy = q_tokens.copy()
     for token in q_tokens_copy:
         # Get the index of the token in the token list
+        #index = -1
+        #for num in "0123456789":
+        #    if num in token:
+        #        index = token_list.index(token)
+        #if index == -1:
         index = binary_search(token_list, token)
         if index == -1:
             print(f"(TESTING) Token '{token}' not found in the index.")
@@ -124,18 +129,7 @@ def run_query(f, query: str, token_list: list, pos_list: list) -> list:
     for i, pos in enumerate(q_pos):
         f.seek(int(pos))
 
-        # ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
-        # testing_line = f.readline()
-        # while True:
-        #     line = f.readline()
-        #     if line[0] != ' ' or line[1] == ":":
-        #         break
-        #     print('(TESTING) adding another line')
-        #     testing_line += line
-        # line = testing_line
-        # ### FOR TESTING - NEED TO FIX INVERTED INDEX ###
-
-        line = f.readline() #TODO: Get rid of above testing code, uncomment this line
+        line = f.readline()
         lines = line.split(' ')
         if lines[0] != q_tokens[i]:
             print(f"Error: Expected token '{q_tokens[i]}' but got '{lines[0]}'")
