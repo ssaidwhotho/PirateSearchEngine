@@ -55,7 +55,7 @@ def get_tokens(document) -> dict and list[tuple]:
             # token: (frequency, title?, bold?, positions)
             if token in token_dict:
                 token_dict[token][0] += 1
-                token_dict[token][3].append(pos)
+                token_dict[token][4].append(pos)
             else:
                 token_dict[token] = [1, token in titles, token in bold or token in bold2, token in headers, [pos]]
             pos += 1
