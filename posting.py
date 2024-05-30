@@ -8,6 +8,7 @@ class Posting:
             positions = []
 
         self.doc_id = doc_id
+        self.fields = ""
         self.word_count = word_count
         self.tfidf = tfidf
         self.positions = positions
@@ -25,6 +26,9 @@ class Posting:
 
     def add_position(self, position):
         self.positions.append(position)
+
+    def add_field(self, field):
+        self.fields += field
 
     def get_positions_str(self):
         if len(self.positions) == 0:

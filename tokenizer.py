@@ -43,6 +43,7 @@ def get_tokens(document) -> dict and list[tuple]:
             hyperlinks.append((link.get('href'), link.text))
         # find title and bold tags
         titles = tokenize(" ".join(tag.get_text() for tag in soup.find_all('title') if tag.get_text()))
+        headers = tokenize(" ".join(tag.get_text() for tag in soup.find_all('header') if tag.get_text()))
         bold = tokenize(" ".join(tag.get_text() for tag in soup.find_all('b') if tag.get_text()))
         bold2 = tokenize(" ".join(tag.get_text() for tag in soup.find_all('strong') if tag.get_text()))
         # tokenize the text for the tags
@@ -56,7 +57,7 @@ def get_tokens(document) -> dict and list[tuple]:
                 token_dict[token][0] += 1
                 token_dict[token][3].append(pos)
             else:
-                token_dict[token] = [1, token in titles, token in bold or token in bold2, [pos]]
+                token_dict[token] = [1, token in titles, token in bold or token in bold2, token in headers, [pos]]
             pos += 1
         return token_dict, hyperlinks
     except Exception as e:

@@ -100,13 +100,16 @@ class InvertedIndex:
                         self.hash_table[token][self.id] = Posting(self.id)
 
                     self.hash_table[token][self.id].word_count = tokens[token][0]
-                    self.hash_table[token][self.id].positions = tokens[token][3]
+                    self.hash_table[token][self.id].positions = tokens[token][4]
                     if tokens[token][1]:
                         # title
-                        self.hash_table[token][self.id].tfidf += float(5)
+                        self.hash_table[token][self.id].add_field('t')
                     if tokens[token][2]:
                         # bold
-                        self.hash_table[token][self.id].tfidf += float(1.5)
+                        self.hash_table[token][self.id].add_field('b')
+                    if tokens[token][3]:
+                        # header
+                        self.hash_table[token][self.id].add_field('h')
 
                 for hyper_links in links:
                     # get the id of the link and do page rank
@@ -132,11 +135,11 @@ class InvertedIndex:
                         for token in tokens:
                             # hyperlink words
                             if token not in self.hash_table:
-                                self.hash_table[token] = {self.id: Posting(self.id)}
-                            elif self.id not in self.hash_table[token]:
-                                self.hash_table[token][self.id] = Posting(self.id)
+                                self.hash_table[token] = {link_id: Posting(link_id)}
+                            elif link_id not in self.hash_table[token]:
+                                self.hash_table[token][link_id] = Posting(link_id)
 
-                            self.hash_table[token][self.id].tfidf += float(1.5)
+                            self.hash_table[token][link_id].add_field('l')
 
             # save the batch to a file
             self.sort_and_save_batch()  # generate partial files
@@ -193,6 +196,7 @@ class InvertedIndex:
                         f" d{doc_id}"  # document id
                         f"w{self.hash_table[key][doc_id].word_count}"  # word count
                         f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
+                        f"f{self.hash_table[key][doc_id].fields}"  # fields
                         f"p{self.hash_table[key][doc_id].get_positions_str()}")  # positions [list]
                 new_save_file.write("\n")
             self.save_files.append(f'inverted_index_{self.name}.txt')

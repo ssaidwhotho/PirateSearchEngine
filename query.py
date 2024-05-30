@@ -2,8 +2,9 @@ import tokenizer
 from pathlib import Path
 import time
 import os
+import math
 
-PAGERANK_WEIGHT = 0.3  # 0-1, 0 = only tfidf, 1 = only pagerank
+PAGERANK_WEIGHT = 0.0001  # 0-1, 0 = only tfidf, 1 = only pagerank
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 
 class search_engine:
@@ -27,6 +28,10 @@ class search_engine:
         self.min_pg, self.max_pg = get_min_max("highest_pagerank.txt")
         self.min_tf, self.max_tf = get_min_max("highest_tfidf.txt")
 
+        self.total_tfidf = get_total_tfidf()
+        self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
+        self.max_tf = self.max_tf / self.total_tfidf
+
 
     def start_search_engine(self):
         """Main function to run the search engine"""
@@ -40,8 +45,8 @@ class search_engine:
                     continue
 
                 print("(TESTING) Query: ", result)
-                result = self.run_query(f, result)
-                self.print_results(result)
+                result, test_res = self.run_query(f, result)
+                self.print_results(result, test_res)
 
         print("Search engine closing, Goodbye!")
 
@@ -76,7 +81,7 @@ class search_engine:
         self.page_rank = page_rank
 
 
-    def print_results(self, result: list) -> None:
+    def print_results(self, result: list, test_res:list) -> None:
         """This function will print the results of the search query."""
         if len(result) == 0:
             print("No results found.")
@@ -86,9 +91,19 @@ class search_engine:
             return
         print("Results: ")
         for i in range(min(10, len(result))):
-            print(f"{i + 1}. doc_id={result[i]}, url={self.url_dict[result[i]]}")
+            total_tfidf = []
+            total_mult = []
+            total_proximity = []
+            pg = 0
+            for t in test_res[i][:-1]:
+                total_tfidf.append(t[0])
+                total_mult.append(t[1])
+                total_proximity.append(t[2])
+            pg = test_res[i][-1]
+            print(f"{i + 1}. doc_id={result[i]}, tf url={self.url_dict[result[i]]}")
+            print(f"---> tfidf={total_tfidf}, mult={total_mult}, proximity={total_proximity}, pagerank={pg}")
 
-    def run_query(self, f, query: str) -> list:
+    def run_query(self, f, query: str) -> (list, list):
         """This function will run the query and return the results."""
         # Start timer here
         start_time = time.time()
@@ -99,7 +114,8 @@ class search_engine:
 
         # Step 2.5: Remove any duplicate tokens, save positions
         duplicate_tokens = {}
-        for i in range(len(q_tokens)):
+        i = 0
+        while i < len(q_tokens):
             if q_tokens[i] in q_tokens[:i]:
                 distance = i - q_tokens[:i].index(q_tokens[i])
                 if q_tokens[i] in duplicate_tokens:
@@ -108,17 +124,13 @@ class search_engine:
                     duplicate_tokens[q_tokens[i]] = [distance]
                 q_tokens.pop(i)
                 i -= 1
+            i += 1
 
         # Step 3: Get the postings list for each term in the query
         q_pos = []
         q_tokens_copy = q_tokens.copy()
         for token in q_tokens_copy:
             # Get the index of the token in the token list
-            #index = -1
-            #for num in "0123456789":
-            #    if num in token:
-            #        index = token_list.index(token)
-            #if index == -1:
             index = binary_search(self.token_list, token)
             if index == -1:
                 print(f"(TESTING) Token '{token}' not found in the index.")
@@ -128,7 +140,9 @@ class search_engine:
 
         # Step 4: Rank the documents based on the query
         doc_rankings = {}
+        test_rankings = {}
         sorted_rankings = []
+        test_sorted = []
         for i, pos in enumerate(q_pos):
             f.seek(int(pos))
 
@@ -145,7 +159,9 @@ class search_engine:
 
             for post in postings:
                 doc_id, word_count, tfidf, positions = post
-                tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf
+                #TODO: doc_id, word_count, tfidf, fields, positions = post
+                tfidf = float(tfidf) / self.total_tfidf # Normalize the tfidf
+                #tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf between 0-1
 
                 proximity_multiplier = 1
                 last_change = 1
@@ -154,31 +170,56 @@ class search_engine:
                         last_change = last_change * self.proximity_weight
                         proximity_multiplier += last_change
 
+                #TODO: for field in fields:
+                #    if field == "l": #linked on another page
+                #        tfidf += 6
+                #    elif field == "t": #title
+                #        tfidf += 3
+                #    elif field == "h": #header
+                #        tfidf += 2
+                #    elif field == "b": #bold
+                #        tfidf += 1
+
+
                 if doc_id in doc_rankings:
                     doc_rankings[doc_id] += tfidf * multiplier * proximity_multiplier
+                    test_rankings[doc_id].append([tfidf, multiplier, proximity_multiplier])
                 else:
                     doc_rankings[doc_id] = tfidf * multiplier * proximity_multiplier
+                    test_rankings[doc_id] = [[tfidf, multiplier, proximity_multiplier]]
 
         for doc_id in doc_rankings:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
+            test_rankings[doc_id].append(self.test_return_pg(doc_id))
 
         for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
             sorted_rankings.append(key)
+            test_sorted.append(test_rankings[key])
 
         # End timer here
         end_time = time.time()
         print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
-        return sorted_rankings
+        return sorted_rankings, test_sorted
 
     def combine_tf_pg(self, doc_id: str, tfidf: float) -> float:
         """This function will combine the tfidf and pagerank values."""
         pg = self.min_pg
         if doc_id in self.page_rank:
             pg = self.page_rank[doc_id]
-        pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
+        #pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
+        #pg = math.log(pg+1,1000000000000)
         return self.tfidf_weight * tfidf + self.pagerank_weight * pg
+
+    def test_return_pg(self, doc_id: str) -> float:
+        """This function will combine the tfidf and pagerank values."""
+        pg = self.min_pg
+        if doc_id in self.page_rank:
+            pg = self.page_rank[doc_id]
+        #pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
+        #pg = math.log(pg+1,1000000000000)
+        return pg
 
 
 def binary_search(arr: list, target: str) -> int:
@@ -204,10 +245,18 @@ def decode_postings(postings: list) -> list:
         doc_id = doc_id[1:]
         word_count, other = other.split("t")
         word_count = int(word_count)
+        #TODO: tfidf, fields = other.split("f")
         tfidf, positions = other.split("p")
         tfidf = float(tfidf)
-        positions = positions[1:-1].split(",")
-        positions = [int(pos) for pos in positions]
+        #TODO: fields, positions = other.split("p")
+        if len(positions) > 0 and positions[0] == "[": # Check to make sure positions isn't empty
+            positions = positions[1:-1].split(",")
+            if positions[-1][-1] == ']':
+                positions[-1] = positions[-1][:-1]
+            positions = [int(pos) for pos in positions]
+        else:
+            positions = []
+        #TODO: decoded.append((doc_id, word_count, tfidf, fields, positions))
         decoded.append((doc_id, word_count, tfidf, positions))
     return decoded
 
@@ -234,11 +283,21 @@ def get_min_max(file_name: str) -> (float, float):
 
     return min_val, max_val
 
+
+def get_total_tfidf() -> float:
+    with open("total_tfidf.txt", "r") as f:
+        total_tfidf = float(f.readline())
+    return total_tfidf
+
+
 def check_files_exist() -> bool:
     """This function will check if the necessary files exist."""
     ii = Path("inverted_index.txt")
     tpl = Path("token_positions_list.txt")
     ud = Path("url_dict.txt")
+    hpg = Path("highest_pagerank.txt")
+    htf = Path("highest_tfidf.txt")
+    ttf = Path("total_tfidf.txt")
 
     if not ii.is_file():
         print("Error: Inverted index file not found.")
@@ -248,6 +307,15 @@ def check_files_exist() -> bool:
         return False
     if not ud.is_file():
         print("Error: URL dictionary file not found.")
+        return False
+    if not hpg.is_file():
+        print("Error: Highest pagerank file not found.")
+        return False
+    if not htf.is_file():
+        print("Error: Highest tfidf file not found.")
+        return False
+    if not ttf.is_file():
+        print("Error: Total tfidf file not found.")
         return False
     return True
 
