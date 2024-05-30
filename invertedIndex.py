@@ -256,9 +256,9 @@ class InvertedIndex:
                     # find the t index which is the document to update
                     t_index = merged_line.index(posting)
                     # get the tfidf value saved in the posting
-                    old_tfidf = float(posting[posting.index('t') + 1:posting.index('p')])
-                    print(f"Old tfidf: {old_tfidf}")
-                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}p{posting[posting.index('p')+1:]}"
+                    old_tfidf = float(posting[posting.index('t') + 1:posting.index('f')])
+                    fields = posting[posting.index('f') + 1:posting.index('p')]
+                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}f{fields}p{posting[posting.index('p')+1:]}"
                     merged_line[t_index] = new_posting
                 merged_line = ' '.join(merged_line)
                 # take out all the new lines
