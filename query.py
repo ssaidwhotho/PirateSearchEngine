@@ -4,48 +4,13 @@ import time
 import os
 import math
 
-PAGERANK_WEIGHT = 0/20  # 0-1, 0 = only tfidf, 1 = only pagerank
+PAGERANK_WEIGHT = 0.01  # 0-1, 0 = only tfidf, 1 = only pagerank
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
-LINKED_WEIGHT = 2/20
-TITLE_WEIGHT = 4/20
-HEADER_WEIGHT = 8/20
-BOLD_WEIGHT = 6/20
-
-def find_best_weights():
-    """This function will find the best weights for the search engine."""
-    best_weights = [0, 0, 0, 0, 0]
-    range_list = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15,
-                  0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1,
-                  1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
-                  2, 2.25, 2.5, 2.75, 3, 4, 5, 7.5, 10]
-    best_time = 1000000
-    highest_ranked = 10000
-    search = search_engine()
-    with open("inverted_index.txt", "r") as f:
-        for i in range_list:
-            for l in range_list:
-                for m in range_list:
-                    for n in range_list:
-                        for o in range_list:
-                            start_time = time.time()
-                            search.pagerank_weight = i
-                            search.linked_weight = l
-                            search.title_weight = m
-                            search.header_weight = n
-                            search.bold_weight = o
-                            result, test_res = search.run_query(f, "cristina lopes")
-                            end_time = time.time()
-                            if result[0].lower().startswith("error: "):
-                                print(result[0])
-                            elif len(result) > 2 and int(result[0]) in [21462,37119] and int(result[1]) in [21462,37119]:
-                                if result.index('13255') < highest_ranked:
-                                    highest_ranked = result.index('13255')
-                                    print("new best weights =", [i, l, m, n, o])
-                                    best_weights = [i, l, m, n, o]
-                                    best_time = end_time - start_time
-
-    print(f"Best weights: {best_weights} with time: {best_time}")
-
+LINKED_WEIGHT = 0.6
+TITLE_WEIGHT = 2
+HEADER_WEIGHT = 2
+BOLD_WEIGHT = 2
+#[0.01, 0.6, 2, 2, 2] are best weights
 
 
 
@@ -75,6 +40,8 @@ class search_engine:
         self.load_bookkeeping_lists()
         self.min_pg, self.max_pg = get_min_max("highest_pagerank.txt")
         self.min_tf, self.max_tf = get_min_max("highest_tfidf.txt")
+        #self.stop_words = get_stop_words()
+        #self.top_words = get_top_words("top_words.txt")
 
         self.total_tfidf = get_total_tfidf()
         self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
@@ -331,6 +298,41 @@ def get_min_max(file_name: str) -> (float, float):
     return min_val, max_val
 
 
+def get_stop_words() -> list:
+    stop_words = [
+            'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
+            'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
+            'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
+            'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
+            "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
+            "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
+            "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
+            'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
+            'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
+            'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
+            'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
+            'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
+            'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
+            'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
+            'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
+            'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
+            "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
+            "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
+            "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+    return stop_words
+
+
+def get_top_words(file_name: str) -> dict:
+    top_words = {}
+    with open(file_name, "r") as f:
+        for i in range(50):
+            line = f.readline()
+            word = line.split(": ")
+            top_words[word[0]] = int(word[1])
+    return top_words
+
+
 def get_total_tfidf() -> float:
     with open("total_tfidf.txt", "r") as f:
         total_tfidf = float(f.readline())
@@ -345,6 +347,7 @@ def check_files_exist() -> bool:
     hpg = Path("highest_pagerank.txt")
     htf = Path("highest_tfidf.txt")
     ttf = Path("total_tfidf.txt")
+    #tw = Path("top_words.txt")
 
     if not ii.is_file():
         print("Error: Inverted index file not found.")
@@ -364,6 +367,9 @@ def check_files_exist() -> bool:
     if not ttf.is_file():
         print("Error: Total tfidf file not found.")
         return False
+    #if not tw.is_file():
+    #    print("Error: Top words file not found.")
+    #    return False
     return True
 
 
@@ -393,7 +399,6 @@ def check_distance(word_positions: list, distance: int) -> int:
 
 
 if __name__ == "__main__":
-    find_best_weights()
-    #search = search_engine()
-    #search.start_search_engine()
+    search = search_engine()
+    search.start_search_engine()
 
