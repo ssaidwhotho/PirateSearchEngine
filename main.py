@@ -31,7 +31,7 @@ def find_total_and_highest_tfidf():
             postings = query.decode_postings(lines[1:])
             max_tfidf = 0
             for post in postings:
-                doc_id, word_count, tfidf, positions = post
+                doc_id, word_count, tfidf, fields, positions = post
                 total_tfidf += tfidf
                 if tfidf > max_tfidf:
                     max_tfidf = tfidf
@@ -97,7 +97,7 @@ def find_most_common_words():
 
             total_count = 0
             for post in postings:
-                doc_id, word_count, tfidf, positions = post
+                doc_id, word_count, tfidf, fields, positions = post
                 total_count += word_count
 
             most_common.append((token, total_count))

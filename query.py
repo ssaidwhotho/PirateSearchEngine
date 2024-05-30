@@ -158,8 +158,7 @@ class search_engine:
             postings = decode_postings(lines[1:])
 
             for post in postings:
-                doc_id, word_count, tfidf, positions = post
-                #TODO: doc_id, word_count, tfidf, fields, positions = post
+                doc_id, word_count, tfidf, fields, positions = post
                 tfidf = float(tfidf) / self.total_tfidf # Normalize the tfidf
                 #tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf between 0-1
 
@@ -170,15 +169,15 @@ class search_engine:
                         last_change = last_change * self.proximity_weight
                         proximity_multiplier += last_change
 
-                #TODO: for field in fields:
-                #    if field == "l": #linked on another page
-                #        tfidf += 6
-                #    elif field == "t": #title
-                #        tfidf += 3
-                #    elif field == "h": #header
-                #        tfidf += 2
-                #    elif field == "b": #bold
-                #        tfidf += 1
+                for field in fields:
+                    if field == "l": #linked on another page
+                        tfidf += 6
+                    elif field == "t": #title
+                        tfidf += 3
+                    elif field == "h": #header
+                        tfidf += 2
+                    elif field == "b": #bold
+                        tfidf += 1
 
 
                 if doc_id in doc_rankings:
@@ -243,12 +242,13 @@ def decode_postings(postings: list) -> list:
     for post in postings:
         doc_id, other = post.split("w")
         doc_id = doc_id[1:]
-        word_count, other = other.split("t")
+        first_t = other.index("t")
+        word_count = other[0:first_t]
+        other = other[first_t+1:]
         word_count = int(word_count)
-        #TODO: tfidf, fields = other.split("f")
-        tfidf, positions = other.split("p")
+        tfidf, fields = other.split("f")
         tfidf = float(tfidf)
-        #TODO: fields, positions = other.split("p")
+        fields, positions = other.split("p")
         if len(positions) > 0 and positions[0] == "[": # Check to make sure positions isn't empty
             positions = positions[1:-1].split(",")
             if positions[-1][-1] == ']':
@@ -256,8 +256,7 @@ def decode_postings(postings: list) -> list:
             positions = [int(pos) for pos in positions]
         else:
             positions = []
-        #TODO: decoded.append((doc_id, word_count, tfidf, fields, positions))
-        decoded.append((doc_id, word_count, tfidf, positions))
+        decoded.append((doc_id, word_count, tfidf, fields, positions))
     return decoded
 
 
