@@ -246,7 +246,7 @@ class InvertedIndex:
                 doc_freq = len(postings)
                 total_docs = len(self.url_dict)
                 for posting in postings:
-                    # format = d{doc_id}w{word_count}t{tfidf}p{positions:list}
+                    # format = d{doc_id}w{word_count}t{tfidf}f{fields}p{positions:list}
                     doc_id = int(posting[1:posting.index('w')])
                     word_count = int(posting[posting.index('w') + 1:posting.index('t')])
                     doc_len = self.url_dict[int(doc_id)][1]
@@ -321,8 +321,13 @@ if __name__ == "__main__":
             for file in files:
                 if file.endswith('.json'):
                     document = inverted_index.read_json(os.path.join(root, file))
+                    if document['url'] == "https://www.ics.uci.edu/faculty/profiles/view_faculty.php?ucinetid=lopes":
+                        print("found the document.")
+                        print(document['content'])
+                        exit(0)
                     document_dict[document['url']] = document
         print("reading the url_dict.txt file.")
+        exit(0)
         for line in f:
             doc_id, url, doc_len = line.split(' ')
             # now look through dev folder to find the document

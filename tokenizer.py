@@ -39,8 +39,14 @@ def get_tokens(document) -> dict and list[tuple]:
             script.extract()
         # find all hyperlinks and their anchor text
         hyperlinks = []
+        check_unique = set()
         for link in soup.find_all('a'):
+            if link.get('href') in check_unique:
+                for existing_link in hyperlinks:
+                    if existing_link[0] == link.get('href'):
+                        existing_link[1] += f" {link.text}"
             hyperlinks.append((link.get('href'), link.text))
+            check_unique.add(link.get('href'))
         # find title and bold tags
         titles = tokenize(" ".join(tag.get_text() for tag in soup.find_all('title') if tag.get_text()))
         headers = tokenize(" ".join(tag.get_text() for tag in soup.find_all('header') if tag.get_text()))

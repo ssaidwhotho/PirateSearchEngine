@@ -4,8 +4,51 @@ import time
 import os
 import math
 
-PAGERANK_WEIGHT = 0.0001  # 0-1, 0 = only tfidf, 1 = only pagerank
+PAGERANK_WEIGHT = 0/20  # 0-1, 0 = only tfidf, 1 = only pagerank
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
+LINKED_WEIGHT = 2/20
+TITLE_WEIGHT = 4/20
+HEADER_WEIGHT = 8/20
+BOLD_WEIGHT = 6/20
+
+def find_best_weights():
+    """This function will find the best weights for the search engine."""
+    best_weights = [0, 0, 0, 0, 0]
+    range_list = [0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15,
+                  0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1,
+                  1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
+                  2, 2.25, 2.5, 2.75, 3, 4, 5, 7.5, 10]
+    best_time = 1000000
+    highest_ranked = 10000
+    search = search_engine()
+    with open("inverted_index.txt", "r") as f:
+        for i in range_list:
+            for l in range_list:
+                for m in range_list:
+                    for n in range_list:
+                        for o in range_list:
+                            start_time = time.time()
+                            search.pagerank_weight = i
+                            search.linked_weight = l
+                            search.title_weight = m
+                            search.header_weight = n
+                            search.bold_weight = o
+                            result, test_res = search.run_query(f, "cristina lopes")
+                            end_time = time.time()
+                            if result[0].lower().startswith("error: "):
+                                print(result[0])
+                            elif len(result) > 2 and int(result[0]) in [21462,37119] and int(result[1]) in [21462,37119]:
+                                if result.index('13255') < highest_ranked:
+                                    highest_ranked = result.index('13255')
+                                    print("new best weights =", [i, l, m, n, o])
+                                    best_weights = [i, l, m, n, o]
+                                    best_time = end_time - start_time
+
+    print(f"Best weights: {best_weights} with time: {best_time}")
+
+
+
+
 
 class search_engine:
     """This class will run the search engine."""
@@ -19,6 +62,11 @@ class search_engine:
         self.pagerank_weight = PAGERANK_WEIGHT
         self.tfidf_weight = 1 - PAGERANK_WEIGHT
         self.proximity_weight = PROXIMITY_WEIGHT
+        self.linked_weight = LINKED_WEIGHT
+        self.title_weight = TITLE_WEIGHT
+        self.header_weight = HEADER_WEIGHT
+        self.bold_weight = BOLD_WEIGHT
+
 
         self.token_list = []
         self.pos_list = []
@@ -101,7 +149,7 @@ class search_engine:
                 total_proximity.append(t[2])
             pg = test_res[i][-1]
             print(f"{i + 1}. doc_id={result[i]}, tf url={self.url_dict[result[i]]}")
-            print(f"---> tfidf={total_tfidf}, mult={total_mult}, proximity={total_proximity}, pagerank={pg}")
+            print(f"(TESTING) tfidf={total_tfidf}, mult={total_mult}, proximity={total_proximity}, pagerank={pg}")
 
     def run_query(self, f, query: str) -> (list, list):
         """This function will run the query and return the results."""
@@ -171,13 +219,13 @@ class search_engine:
 
                 for field in fields:
                     if field == "l": #linked on another page
-                        tfidf += 6
+                        tfidf += self.linked_weight
                     elif field == "t": #title
-                        tfidf += 3
+                        tfidf += self.title_weight
                     elif field == "h": #header
-                        tfidf += 2
+                        tfidf += self.header_weight
                     elif field == "b": #bold
-                        tfidf += 1
+                        tfidf += self.bold_weight
 
 
                 if doc_id in doc_rankings:
@@ -197,7 +245,7 @@ class search_engine:
 
         # End timer here
         end_time = time.time()
-        print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+        #TODO: Uncomment: print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
         return sorted_rankings, test_sorted
@@ -343,4 +391,9 @@ def check_distance(word_positions: list, distance: int) -> int:
 
     return count
 
+
+if __name__ == "__main__":
+    find_best_weights()
+    #search = search_engine()
+    #search.start_search_engine()
 
