@@ -181,8 +181,8 @@ class InvertedIndex:
 
     def sort_and_save_batch(self) -> None:
         # sort the hash table and save to custom txt file for seeking
-        # sort the dictionary by the keys alphabetically with numbers last
-        self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: (not x[0].isnumeric(), x[0])))
+        # sort the dictionary by the keys alphabetically and with numbers do it by value (less to greater)
+        self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: x[0]))
         # every new line is a token, and it's posting is to the right of the line
         # create a new file for the batch
         with open(f'inverted_index_{self.name}.txt', 'w') as new_save_file:
