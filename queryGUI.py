@@ -115,7 +115,7 @@ def gui():
     st.title("Yar Piratey Search Engine")
     # Allow user to click search or press enter to submit the form
     form = st.form("search_form")
-    query = form.text_input("Searchin' for treasure? Enter yer search plunder here!", placeholder="e.g. 'arrrr pirate ships' or 'yarrr treasure maps'")
+    query = form.text_input("Searchin' for treasure? Enter yer search plunder here!", placeholder="e.g. \"Yarrrr! Pirate ships\" or \"Ahoy! Maps o' treasure\"")
     submit_button = form.form_submit_button("Ponder yar query")
 
     #st.image("FishingRod.gif")
@@ -143,9 +143,9 @@ def gui():
                     for word in split_query[:]:
                         if word in get_stop_words():
                             split_query.remove(word)
-                    result, test_res = search_engine.run_query(f, " ".join(split_query))
+                    result = search_engine.run_query(f, " ".join(split_query))
                 else:
-                    result, test_res = search_engine.run_query(f, query)
+                    result = search_engine.run_query(f, query)
 
             end_time = time.time()
             st.markdown(f"**{len(result)} results found in {end_time - start_time:.10f} seconds.**")
