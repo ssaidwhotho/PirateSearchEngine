@@ -4,33 +4,32 @@ import time
 import os
 import math
 
-PAGERANK_WEIGHT = 0.01  # 0-1, 0 = only tfidf, 1 = only pagerank
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
-LINKED_WEIGHT = 0.6
-TITLE_WEIGHT = 2
-HEADER_WEIGHT = 2
-BOLD_WEIGHT = 2
-#[0.01, 0.6, 2, 2, 2] are best weights
 
-
+#older best_weights[0.664645, 0.9206789999999999, 7.48427, 0.6706199999999999, 12.37362, 0.7252109999999999, -0.19983, 0.27105599999999996, 4.18218] are best weights
+BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
 
 
 class search_engine:
     """This class will run the search engine."""
     def __init__(self):
-        print("Search Engine Started")
+        #TODO: Uncomment: print("Search Engine Started")
 
-        if not check_files_exist():
-            print("Search engine closing, Goodbye!")
-            exit(1)
+        #TODO: Uncomment: if not check_files_exist():
+        #    print("Search engine closing, Goodbye!")
+        #    exit(1)
 
-        self.pagerank_weight = PAGERANK_WEIGHT
-        self.tfidf_weight = 1 - PAGERANK_WEIGHT
+        self.pagerank_weight = BEST_WEIGHTS[0]
+        self.tfidf_weight = 1 - self.pagerank_weight
         self.proximity_weight = PROXIMITY_WEIGHT
-        self.linked_weight = LINKED_WEIGHT
-        self.title_weight = TITLE_WEIGHT
-        self.header_weight = HEADER_WEIGHT
-        self.bold_weight = BOLD_WEIGHT
+        self.linked_weight = BEST_WEIGHTS[2]
+        self.title_weight = BEST_WEIGHTS[4]
+        self.header_weight = BEST_WEIGHTS[6]
+        self.bold_weight = BEST_WEIGHTS[8]
+        self.m_linked_weight = BEST_WEIGHTS[1]
+        self.m_title_weight = BEST_WEIGHTS[3]
+        self.m_header_weight = BEST_WEIGHTS[5]
+        self.m_bold_weight = BEST_WEIGHTS[7]
 
 
         self.token_list = []
@@ -43,7 +42,7 @@ class search_engine:
         #self.stop_words = get_stop_words()
         #self.top_words = get_top_words("top_words.txt")
 
-        self.total_tfidf = get_total_tfidf()
+        self.total_tfidf = 150644.1444295766 #TODO: replace with get_total_tfidf()
         self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
         self.max_tf = self.max_tf / self.total_tfidf
 
@@ -187,12 +186,20 @@ class search_engine:
                 for field in fields:
                     if field == "l": #linked on another page
                         tfidf += self.linked_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_linked_weight:.7f}")
                     elif field == "t": #title
                         tfidf += self.title_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_title_weight:.7f}")
                     elif field == "h": #header
                         tfidf += self.header_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_header_weight:.7f}")
                     elif field == "b": #bold
                         tfidf += self.bold_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_bold_weight:.7f}")
 
 
                 if doc_id in doc_rankings:

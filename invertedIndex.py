@@ -93,6 +93,7 @@ class InvertedIndex:
                 self.id += 1
                 total_words = sum(tokens[token][0] for token in tokens.keys())
                 self.url_dict[self.id] = (document['url'], total_words)
+
                 for token in tokens.keys():
                     if token not in self.hash_table:
                         self.hash_table[token] = {self.id: Posting(self.id)}
@@ -110,6 +111,15 @@ class InvertedIndex:
                     if tokens[token][3]:
                         # header
                         self.hash_table[token][self.id].add_field('h')
+
+                # To add tokens from the pages own URL
+                url_tokens = tokenizer.url_tokenize(document['url'])
+                for token in url_tokens:
+                    if token not in self.hash_table:
+                        self.hash_table[token] = {self.id: Posting(self.id)}
+                    elif self.id not in self.hash_table[token]:
+                        self.hash_table[token][self.id] = Posting(self.id)
+                    self.hash_table[token][self.id].add_field('lt') #Add as a title and link
 
                 for hyper_links in links:
                     # get the id of the link and do page rank
