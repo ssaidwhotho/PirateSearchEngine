@@ -27,6 +27,21 @@ def tokenize(text: str) -> list:
     return tokens
 
 
+def url_tokenize(url: str) -> list:
+    """
+    This function will take in a url and return a list of tokens.
+    :param url: str
+    :return: list of tokens
+    """
+    url = " ".join(url.split("://")[1].split("/"))
+    url = url.replace("www.", " ")
+    url = url.replace(".uci.edu", " ")
+    for i in range(len(url)):
+        if not is_alphanumeric(url[i]):
+            url = url.replace(url[i], " ")
+    return tokenize(url)
+
+
 def get_tokens(document) -> dict and list[tuple]:
     """
     This function will take in the document, which is the json, and then will
