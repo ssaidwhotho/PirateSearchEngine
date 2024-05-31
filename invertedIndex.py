@@ -100,13 +100,16 @@ class InvertedIndex:
                         self.hash_table[token][self.id] = Posting(self.id)
 
                     self.hash_table[token][self.id].word_count = tokens[token][0]
-                    self.hash_table[token][self.id].positions = tokens[token][3]
+                    self.hash_table[token][self.id].positions = tokens[token][4]
                     if tokens[token][1]:
                         # title
-                        self.hash_table[token][self.id].tfidf += float(5)
+                        self.hash_table[token][self.id].add_field('t')
                     if tokens[token][2]:
                         # bold
-                        self.hash_table[token][self.id].tfidf += float(1.5)
+                        self.hash_table[token][self.id].add_field('b')
+                    if tokens[token][3]:
+                        # header
+                        self.hash_table[token][self.id].add_field('h')
 
                 for hyper_links in links:
                     # get the id of the link and do page rank
@@ -132,11 +135,11 @@ class InvertedIndex:
                         for token in tokens:
                             # hyperlink words
                             if token not in self.hash_table:
-                                self.hash_table[token] = {self.id: Posting(self.id)}
-                            elif self.id not in self.hash_table[token]:
-                                self.hash_table[token][self.id] = Posting(self.id)
+                                self.hash_table[token] = {link_id: Posting(link_id)}
+                            elif link_id not in self.hash_table[token]:
+                                self.hash_table[token][link_id] = Posting(link_id)
 
-                            self.hash_table[token][self.id].tfidf += float(1.5)
+                            self.hash_table[token][link_id].add_field('l')
 
             # save the batch to a file
             self.sort_and_save_batch()  # generate partial files
@@ -181,7 +184,6 @@ class InvertedIndex:
 
     def sort_and_save_batch(self) -> None:
         # sort the hash table and save to custom txt file for seeking
-        # sort the dictionary by the keys alphabetically and with numbers do it by value (less to greater)
         self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: x[0]))
         # every new line is a token, and it's posting is to the right of the line
         # create a new file for the batch
@@ -193,6 +195,7 @@ class InvertedIndex:
                         f" d{doc_id}"  # document id
                         f"w{self.hash_table[key][doc_id].word_count}"  # word count
                         f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
+                        f"f{self.hash_table[key][doc_id].fields}"  # fields
                         f"p{self.hash_table[key][doc_id].get_positions_str()}")  # positions [list]
                 new_save_file.write("\n")
             self.save_files.append(f'inverted_index_{self.name}.txt')
@@ -242,7 +245,7 @@ class InvertedIndex:
                 doc_freq = len(postings)
                 total_docs = len(self.url_dict)
                 for posting in postings:
-                    # format = d{doc_id}w{word_count}t{tfidf}p{positions:list}
+                    # format = d{doc_id}w{word_count}t{tfidf}f{fields}p{positions:list}
                     doc_id = int(posting[1:posting.index('w')])
                     word_count = int(posting[posting.index('w') + 1:posting.index('t')])
                     doc_len = self.url_dict[int(doc_id)][1]
@@ -252,9 +255,9 @@ class InvertedIndex:
                     # find the t index which is the document to update
                     t_index = merged_line.index(posting)
                     # get the tfidf value saved in the posting
-                    old_tfidf = float(posting[posting.index('t') + 1:posting.index('p')])
-                    print(f"Old tfidf: {old_tfidf}")
-                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}p{posting[posting.index('p')+1:]}"
+                    old_tfidf = float(posting[posting.index('t') + 1:posting.index('f')])
+                    fields = posting[posting.index('f') + 1:posting.index('p')]
+                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}f{fields}p{posting[posting.index('p')+1:]}"
                     merged_line[t_index] = new_posting
                 merged_line = ' '.join(merged_line)
                 # take out all the new lines
@@ -317,6 +320,10 @@ if __name__ == "__main__":
             for file in files:
                 if file.endswith('.json'):
                     document = inverted_index.read_json(os.path.join(root, file))
+                    if document['url'] == "https://www.ics.uci.edu/faculty/profiles/view_faculty.php?ucinetid=lopes":
+                        print("found the document.")
+                        print(document['content'])
+                        exit(0)
                     document_dict[document['url']] = document
         print("reading the url_dict.txt file.")
         for line in f:
