@@ -8,17 +8,16 @@ PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25
 
 #older best_weights[0.664645, 0.9206789999999999, 7.48427, 0.6706199999999999, 12.37362, 0.7252109999999999, -0.19983, 0.27105599999999996, 4.18218] are best weights
 #old BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
-#old BEST_WEIGHTS = [0.423982, 0.834543, 2.15262, 0.142305, 2.15524, 1.332237, 2.62785, 0.558939, 0.76046]
 BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013]
 
 class search_engine:
     """This class will run the search engine."""
     def __init__(self):
-        #TODO: Uncomment: print("Search Engine Started")
+        print("Search Engine Started")
 
-        # if not check_files_exist():
-        #    print("Search engine closing, Goodbye!")
-        #    exit(1)
+        if not check_files_exist():
+            print("Search engine closing, Goodbye!")
+            exit(1)
 
         self.pagerank_weight = BEST_WEIGHTS[0]
         self.tfidf_weight = 1 - self.pagerank_weight
@@ -44,10 +43,10 @@ class search_engine:
         self.load_bookkeeping_lists()
         self.min_pg, self.max_pg = get_min_max("highest_pagerank.txt")
         self.min_tf, self.max_tf = get_min_max("highest_tfidf.txt")
-        #self.stop_words = get_stop_words()
-        #self.top_words = get_top_words("top_words.txt")
+        self.stop_words = get_stop_words()
+        self.top_words = get_top_words("top_words.txt")
 
-        self.total_tfidf = 150644.1444295766 #TODO: replace with get_total_tfidf()
+        self.total_tfidf = get_total_tfidf()
         self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
         self.max_tf = self.max_tf / self.total_tfidf
 
@@ -145,6 +144,23 @@ class search_engine:
                 i -= 1
             i += 1
 
+        # Step 2.75: Check for stop words and top words
+        slow_words = 1
+        sw_count = 0
+        for i in range(len(q_tokens)):
+            if q_tokens[i] in self.stop_words:
+                slow_words *= 2
+                sw_count += 1
+            elif q_tokens[i] in self.top_words:
+                slow_words *= 2
+
+        if sw_count / len(q_tokens) < 0.35:
+            qt_copy = q_tokens.copy()
+            for i in range(len(q_tokens)):
+                if q_tokens[i] in self.stop_words:
+                    qt_copy.remove(q_tokens[i])
+            q_tokens = qt_copy
+
         # Step 3: Get the postings list for each term in the query
         q_pos = []
         q_tokens_copy = q_tokens.copy()
@@ -156,6 +172,15 @@ class search_engine:
                 q_tokens.remove(token)
                 continue
             q_pos.append(self.pos_list[index])
+
+        # Step 3.5: Assign search ranges to limit search time for stop words
+        search_ranges = []
+        for i in range(len(q_tokens)):
+            search_ranges.append(-1)
+            if q_tokens[i] in self.stop_words:
+                search_ranges[i] = 1000 // slow_words
+            if q_tokens[i] in self.top_words:
+                search_ranges[i] = 2000 // slow_words
 
         # Step 4: Rank the documents based on the query
         doc_rankings = {}
@@ -174,7 +199,7 @@ class search_engine:
             multiplier = 1
             if token in duplicate_tokens:
                 multiplier += len(duplicate_tokens[token])
-            postings = decode_postings(lines[1:])
+            postings = self.decode_postings(search_ranges[i], lines[1:])
 
             for post in postings:
                 doc_id, word_count, tfidf, fields, positions = post
@@ -197,7 +222,7 @@ class search_engine:
                         tfidf += self.title_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_title_weight:.7f}")
-                    elif field == "h": #header
+                    elif field == "h": #header, TODO: change to "x" and h1
                         tfidf += self.header_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_header_weight:.7f}")
@@ -214,7 +239,6 @@ class search_engine:
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_bold_weight:.7f}")
 
-
                 if doc_id in doc_rankings:
                     doc_rankings[doc_id] += tfidf * multiplier * proximity_multiplier
                     test_rankings[doc_id].append([tfidf, multiplier, proximity_multiplier])
@@ -226,13 +250,14 @@ class search_engine:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
             test_rankings[doc_id].append(self.test_return_pg(doc_id))
 
+        # Step 4.5: Sort the documents by their rankings
         for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
             sorted_rankings.append(key)
             test_sorted.append(test_rankings[key])
 
         # End timer here
         end_time = time.time()
-        #TODO: Uncomment: print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+        print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
         return sorted_rankings, test_sorted
@@ -255,6 +280,44 @@ class search_engine:
         #pg = math.log(pg+1,1000000000000)
         return pg
 
+    def decode_postings(self, search_range: int, postings: list) -> list:
+        """This function will decode the postings list and return it as a list of tuples."""
+        if search_range == 0.0:
+            return []
+        decoded = []
+        top_tfidf = []
+        if search_range != -1:
+            top_tfidf = [0.0 for i in range(int(search_range))]
+
+
+        for post in postings:
+            doc_id, other = post.split("w")
+            doc_id = doc_id[1:]
+            first_t = other.index("t")
+            word_count = other[0:first_t]
+            other = other[first_t + 1:]
+            word_count = int(word_count)
+            tfidf, fields = other.split("f")
+            tfidf = float(tfidf)
+            if search_range != -1 and len(top_tfidf) > 0:
+                if tfidf > top_tfidf[0]:
+                    ind = binary_search_index(top_tfidf, tfidf)
+                    top_tfidf.insert(ind, tfidf)
+                    top_tfidf.pop(0)
+                else:
+                    continue
+            fields, positions = other.split("p")
+            if len(positions) > 0 and positions[
+                0] == "[":  # Check to make sure positions isn't empty
+                positions = positions[1:-1].split(",")
+                if positions[-1][-1] == ']':
+                    positions[-1] = positions[-1][:-1]
+                positions = [int(pos) for pos in positions]
+            else:
+                positions = []
+            decoded.append((doc_id, word_count, tfidf, fields, positions))
+        return decoded
+
 
 def binary_search(arr: list, target: str) -> int:
     """This function will perform a binary search on the list and return the index of the target."""
@@ -271,28 +334,21 @@ def binary_search(arr: list, target: str) -> int:
     return -1
 
 
-def decode_postings(postings: list) -> list:
-    """This function will decode the postings list and return it as a list of tuples."""
-    decoded = []
-    for post in postings:
-        doc_id, other = post.split("w")
-        doc_id = doc_id[1:]
-        first_t = other.index("t")
-        word_count = other[0:first_t]
-        other = other[first_t+1:]
-        word_count = int(word_count)
-        tfidf, fields = other.split("f")
-        tfidf = float(tfidf)
-        fields, positions = other.split("p")
-        if len(positions) > 0 and positions[0] == "[": # Check to make sure positions isn't empty
-            positions = positions[1:-1].split(",")
-            if positions[-1][-1] == ']':
-                positions[-1] = positions[-1][:-1]
-            positions = [int(pos) for pos in positions]
+def binary_search_index(arr: list, target: float) -> int:
+    """This function will perform a binary search on the list and return the index of the target."""
+    left = 0
+    right = len(arr) - 1
+    mid = (left + right) // 2
+    while left <= right:
+        mid = (left + right) // 2
+        if arr[mid] < target:
+            left = mid + 1
+            mid += 1
+        elif arr[mid] > target:
+            right = mid - 1
         else:
-            positions = []
-        decoded.append((doc_id, word_count, tfidf, fields, positions))
-    return decoded
+            return mid
+    return mid
 
 
 def get_min_max(file_name: str) -> (float, float):
@@ -343,13 +399,13 @@ def get_stop_words() -> list:
     return stop_words
 
 
-def get_top_words(file_name: str) -> dict:
-    top_words = {}
+def get_top_words(file_name: str) -> list:
+    top_words = []
     with open(file_name, "r") as f:
         for i in range(50):
             line = f.readline()
             word = line.split(": ")
-            top_words[word[0]] = int(word[1])
+            top_words.append(word[0])
     return top_words
 
 
@@ -367,7 +423,7 @@ def check_files_exist() -> bool:
     hpg = Path("highest_pagerank.txt")
     htf = Path("highest_tfidf.txt")
     ttf = Path("total_tfidf.txt")
-    #tw = Path("top_words.txt")
+    tw = Path("top_words.txt")
 
     if not ii.is_file():
         print("Error: Inverted index file not found.")
@@ -387,13 +443,13 @@ def check_files_exist() -> bool:
     if not ttf.is_file():
         print("Error: Total tfidf file not found.")
         return False
-    #if not tw.is_file():
-    #    print("Error: Top words file not found.")
-    #    return False
+    if not tw.is_file():
+        print("Error: Top words file not found.")
+        return False
     return True
 
 
-def get_query() -> str: #TODO: Replace with the GUI
+def get_query() -> str: #Replaced with the GUI
     """This function will get the query from the user and return it as a string."""
     query = input("\nEnter a query or type 'exit' to quit: ")
     if query.lower() == "exit":
@@ -421,4 +477,3 @@ def check_distance(word_positions: list, distance: int) -> int:
 if __name__ == "__main__":
     search = search_engine()
     search.start_search_engine()
-
