@@ -101,7 +101,7 @@ class InvertedIndex:
                         self.hash_table[token][self.id] = Posting(self.id)
 
                     self.hash_table[token][self.id].word_count = tokens[token][0]
-                    self.hash_table[token][self.id].positions = tokens[token][4]
+                    self.hash_table[token][self.id].positions = tokens[token][6]
                     if tokens[token][1]:
                         # title
                         self.hash_table[token][self.id].add_field('t')
@@ -110,7 +110,13 @@ class InvertedIndex:
                         self.hash_table[token][self.id].add_field('b')
                     if tokens[token][3]:
                         # header
-                        self.hash_table[token][self.id].add_field('h')
+                        self.hash_table[token][self.id].add_field('x')
+                    if tokens[token][4]:
+                        # header
+                        self.hash_table[token][self.id].add_field('y')
+                    if tokens[token][5]:
+                        # header
+                        self.hash_table[token][self.id].add_field('z')
 
                 # To add tokens from the pages own URL
                 url_tokens = tokenizer.url_tokenize(document['url'])
@@ -260,8 +266,8 @@ class InvertedIndex:
                     doc_id = int(posting[1:posting.index('w')])
                     word_count = int(posting[posting.index('w') + 1:posting.index('t')])
                     doc_len = self.url_dict[int(doc_id)][1]
-                    tf = word_count / doc_len
-                    idf = 1 + math.log(total_docs / doc_freq)
+                    tf = word_count / max(doc_len, 1)
+                    idf = 1 + math.log(total_docs / max(doc_freq, 1))
                     tfidf = tf * idf
                     # find the t index which is the document to update
                     t_index = merged_line.index(posting)
@@ -320,6 +326,7 @@ class InvertedIndex:
 
 if __name__ == "__main__":
     inverted_index = InvertedIndex()
+    #url_dict = {}
     # inverted_index.create_inverted_index()
     # TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index creation with Adam's info
     documents = []
@@ -331,15 +338,11 @@ if __name__ == "__main__":
             for file in files:
                 if file.endswith('.json'):
                     document = inverted_index.read_json(os.path.join(root, file))
-                    if document['url'] == "https://www.ics.uci.edu/faculty/profiles/view_faculty.php?ucinetid=lopes":
-                        print("found the document.")
-                        print(document['content'])
-                        exit(0)
                     document_dict[document['url']] = document
         print("reading the url_dict.txt file.")
-        exit(0)
         for line in f:
             doc_id, url, doc_len = line.split(' ')
+            #url_dict[int(doc_id)] = (url, int(doc_len))
             # now look through dev folder to find the document
             if url in document_dict:
                 documents.append(document_dict[url])

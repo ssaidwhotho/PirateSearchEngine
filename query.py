@@ -7,15 +7,16 @@ import math
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 
 #older best_weights[0.664645, 0.9206789999999999, 7.48427, 0.6706199999999999, 12.37362, 0.7252109999999999, -0.19983, 0.27105599999999996, 4.18218] are best weights
-BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
-
+#old BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
+#old BEST_WEIGHTS = [0.423982, 0.834543, 2.15262, 0.142305, 2.15524, 1.332237, 2.62785, 0.558939, 0.76046]
+BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013]
 
 class search_engine:
     """This class will run the search engine."""
     def __init__(self):
         #TODO: Uncomment: print("Search Engine Started")
 
-        #TODO: Uncomment: if not check_files_exist():
+        # if not check_files_exist():
         #    print("Search engine closing, Goodbye!")
         #    exit(1)
 
@@ -25,11 +26,15 @@ class search_engine:
         self.linked_weight = BEST_WEIGHTS[2]
         self.title_weight = BEST_WEIGHTS[4]
         self.header_weight = BEST_WEIGHTS[6]
+        #self.h2_weight = BEST_WEIGHTS[10]
+        #self.h3_weight = BEST_WEIGHTS[12]
         self.bold_weight = BEST_WEIGHTS[8]
         self.m_linked_weight = BEST_WEIGHTS[1]
         self.m_title_weight = BEST_WEIGHTS[3]
         self.m_header_weight = BEST_WEIGHTS[5]
         self.m_bold_weight = BEST_WEIGHTS[7]
+        #self.m_h2_weight = BEST_WEIGHTS[9]
+        #self.m_h3_weight = BEST_WEIGHTS[11]
 
 
         self.token_list = []
@@ -196,6 +201,14 @@ class search_engine:
                         tfidf += self.header_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_header_weight:.7f}")
+                    # elif field == "y": #h2
+                    #     tfidf += self.h2_weight
+                    #     tfidf = float(f"{tfidf:.7f}")
+                    #     tfidf *= float(f"{self.m_h2_weight:.7f}")
+                    # elif field == "z": #h3
+                    #     tfidf += self.h3_weight
+                    #     tfidf = float(f"{tfidf:.7f}")
+                    #     tfidf *= float(f"{self.m_h3_weight:.7f}")
                     elif field == "b": #bold
                         tfidf += self.bold_weight
                         tfidf = float(f"{tfidf:.7f}")
