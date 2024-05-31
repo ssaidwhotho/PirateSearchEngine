@@ -7,7 +7,7 @@ import re
 import html
 
 ## test
-from memory_profiler import profile
+#from memory_profiler import profile
 
 
 api_key = "sk-proj-Zte7OZtDW8CTRUyBaul4T3BlbkFJwb20WT0IGnSmsKZrekNM"
@@ -95,7 +95,7 @@ def summarize_with_chatgpt(text, query):
 
     return summary
 
-@profile
+#@profile
 def gui():
     page_bg_img = """
             <style>
@@ -132,8 +132,8 @@ def gui():
         if len(query) == 0:
             st.error("Query cannot be empty.")
         else:
-            fishingrod = form.image("SmallerFishing.gif")
-            pondering = form.html("<p>Yarrrr! Searching the seven seas...</p>")
+            pondering = st.html("<p>Yarrrr! Searching the seven seas...</p>")
+            fishingrod = st.image("ShipBottle.gif")
             start_time = time.time()
 
             # Run query using the loaded bookkeeping lists

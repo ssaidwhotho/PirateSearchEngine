@@ -63,8 +63,8 @@ class search_engine:
                     continue
 
                 print("(TESTING) Query: ", result)
-                result, test_res = self.run_query(f, result)
-                self.print_results(result, test_res)
+                result = self.run_query(f, result)
+                self.print_results(result)
 
         print("Search engine closing, Goodbye!")
 
@@ -99,7 +99,7 @@ class search_engine:
         self.page_rank = page_rank
 
 
-    def print_results(self, result: list, test_res:list) -> None:
+    def print_results(self, result: list) -> None:
         """This function will print the results of the search query."""
         if len(result) == 0:
             print("No results found.")
@@ -109,19 +109,9 @@ class search_engine:
             return
         print("Results: ")
         for i in range(min(10, len(result))):
-            total_tfidf = []
-            total_mult = []
-            total_proximity = []
-            pg = 0
-            for t in test_res[i][:-1]:
-                total_tfidf.append(t[0])
-                total_mult.append(t[1])
-                total_proximity.append(t[2])
-            pg = test_res[i][-1]
             print(f"{i + 1}. doc_id={result[i]}, tf url={self.url_dict[result[i]]}")
-            print(f"(TESTING) tfidf={total_tfidf}, mult={total_mult}, proximity={total_proximity}, pagerank={pg}")
 
-    def run_query(self, f, query: str) -> (list, list):
+    def run_query(self, f, query: str) -> list:
         """This function will run the query and return the results."""
         # Start timer here
         start_time = time.time()
@@ -184,9 +174,7 @@ class search_engine:
 
         # Step 4: Rank the documents based on the query
         doc_rankings = {}
-        test_rankings = {}
         sorted_rankings = []
-        test_sorted = []
         for i, pos in enumerate(q_pos):
             f.seek(int(pos))
 
@@ -241,26 +229,22 @@ class search_engine:
 
                 if doc_id in doc_rankings:
                     doc_rankings[doc_id] += tfidf * multiplier * proximity_multiplier
-                    test_rankings[doc_id].append([tfidf, multiplier, proximity_multiplier])
                 else:
                     doc_rankings[doc_id] = tfidf * multiplier * proximity_multiplier
-                    test_rankings[doc_id] = [[tfidf, multiplier, proximity_multiplier]]
 
         for doc_id in doc_rankings:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
-            test_rankings[doc_id].append(self.test_return_pg(doc_id))
 
         # Step 4.5: Sort the documents by their rankings
         for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
             sorted_rankings.append(key)
-            test_sorted.append(test_rankings[key])
 
         # End timer here
         end_time = time.time()
         print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
-        return sorted_rankings, test_sorted
+        return sorted_rankings
 
     def combine_tf_pg(self, doc_id: str, tfidf: float) -> float:
         """This function will combine the tfidf and pagerank values."""
@@ -270,15 +254,6 @@ class search_engine:
         #pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
         #pg = math.log(pg+1,1000000000000)
         return self.tfidf_weight * tfidf + self.pagerank_weight * pg
-
-    def test_return_pg(self, doc_id: str) -> float:
-        """This function will combine the tfidf and pagerank values."""
-        pg = self.min_pg
-        if doc_id in self.page_rank:
-            pg = self.page_rank[doc_id]
-        #pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
-        #pg = math.log(pg+1,1000000000000)
-        return pg
 
     def decode_postings(self, search_range: int, postings: list) -> list:
         """This function will decode the postings list and return it as a list of tuples."""
