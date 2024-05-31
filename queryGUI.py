@@ -3,9 +3,11 @@ import time
 from query import search_engine as se, check_files_exist
 import requests
 from bs4 import BeautifulSoup
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import re
 import html
+
+## test
+from memory_profiler import profile
 
 
 api_key = "sk-proj-Zte7OZtDW8CTRUyBaul4T3BlbkFJwb20WT0IGnSmsKZrekNM"
@@ -15,8 +17,6 @@ headers = {
 }
 
 
-tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
 
 def get_stop_words() -> list:
     stop_words = [
@@ -71,7 +71,7 @@ def fetch_content(url):
 
 
 def summarize_with_chatgpt(text, query):
-    prompt = f"Summarize the following search engine website text about {query}: {text} "
+    prompt = f"Using pirate speak, Summarize the following search engine website text about {query}: {text}"
     response = requests.post(
         "https://api.openai.com/v1/chat/completions",
         headers=headers,
@@ -95,14 +95,31 @@ def summarize_with_chatgpt(text, query):
 
     return summary
 
-
+@profile
 def gui():
-    st.title("Search Engine")
+    page_bg_img = """
+            <style>
+            [data-testid="stAppViewContainer"] {
+            background-image: url("https://cdn.discordapp.com/attachments/1034912286487359538/1246004590948778074/PirateBackgroundLighter.png?ex=665acfb4&is=66597e34&hm=bc9c6c4d7b3ab7106334c8102ffa6026528912abb0e5331011532bf37ed52d40&");
+            background-size: cover;
+            }
+            [data-testid="stHeader"] {
+            background-image: url("https://cdn.discordapp.com/attachments/1034912286487359538/1246007400687865886/NewPirateBanner.png?ex=665ad252&is=665980d2&hm=1cde1845a618079b1f2c97230326aa44703a9ae92b47b5a3b2f96cb524945b7d&");
+            </style>
+            """
 
+
+
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+
+    st.title("Yar Piratey Search Engine")
     # Allow user to click search or press enter to submit the form
-    with st.form("search_form"):
-        query = st.text_input("Enter your search query", "")
-        submit_button = st.form_submit_button("Search")
+    form = st.form("search_form")
+    query = form.text_input("Searchin' for treasure? Enter yer search plunder here!", placeholder="e.g. 'arrrr pirate ships' or 'yarrr treasure maps'")
+    submit_button = form.form_submit_button("Ponder yar query")
+
+    #st.image("FishingRod.gif")
+    #st.logo("PirateWheelSpin.gif")
 
     # Load the inverted index and bookkeeping lists once when the app starts
     if not check_files_exist():
@@ -115,11 +132,20 @@ def gui():
         if len(query) == 0:
             st.error("Query cannot be empty.")
         else:
+            fishingrod = form.image("SmallerFishing.gif")
+            pondering = form.html("<p>Yarrrr! Searching the seven seas...</p>")
             start_time = time.time()
 
             # Run query using the loaded bookkeeping lists
             with open("inverted_index.txt", "r") as f:
-                result, test_res = search_engine.run_query(f, query)
+                if len(query.split()) > 12:  # too many stop words
+                    split_query = query.split()
+                    for word in split_query[:]:
+                        if word in get_stop_words():
+                            split_query.remove(word)
+                    result, test_res = search_engine.run_query(f, " ".join(split_query))
+                else:
+                    result, test_res = search_engine.run_query(f, query)
 
             end_time = time.time()
             st.markdown(f"**{len(result)} results found in {end_time - start_time:.10f} seconds.**")
@@ -140,8 +166,13 @@ def gui():
                 else:  # An error occurred while fetching the content
                     summary = content_or_error
 
-                st.markdown(f"**{i + 1}.** [{url}]({url})", unsafe_allow_html=False)
+                st.markdown(f"**{i + 1}.** [{url}](url)", unsafe_allow_html=False)
                 st.markdown(f"**Summary:** {summary}")
+
+            fishingrod.empty()
+            pondering.empty()
+
+
 
 
 
