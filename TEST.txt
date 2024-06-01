@@ -1,0 +1,46 @@
+research areas in cs
+- great query and gets detailed results
+cristina lopes
+- great query due to importance on title and link usage
+ics
+- gets very great results due to importance of link
+klefstad
+- gets specific results for the professor
+professor klefstad
+- gets even more specific results with professor added
+ai club
+- gets ai club results and clubs that are related to ai at uci
+masters of software engineering
+- links perfectly to masters of software engineering
+statistics
+- gets the stats website and other related stats websites
+shu kong
+- PH.d alumni who gets their specific website
+computer science
+- gets the computer science website and related websties
+thornton
+- gets the thornton website and related websites
+ics33
+- gets ics33 related content
+Louie
+- finds mentions of Louie but more for fun query
+Adam
+- finds mentions of Adam from urls but a fun query again
+Sam
+- finds mentions of Sam from urls but a fun query x3
+Ashar
+- fun query that doesn't find anything for ashar
+Leonardo
+- my first name (louie) but it just finds the mentions of Leonardo again
+search engine
+- finds search engine related websites though could probably be better with x-grams
+Pirate
+- fun query to find pirate related sites, though all we find are pictures?
+Boat
+- fun query for boat related sites in ics
+weather
+- casual weather lookup for weather and finds general weather finds but nothing specific as predicted
+irvine
+- finds irvine related websites
+weather irvine
+- very bad and just combines the two queries with no real relevant results
