@@ -29,7 +29,7 @@ def tokenize(text: str) -> list:
 
 def url_tokenize(url: str) -> list:
     """
-    This function will take in an url and return a list of tokens.
+    This function will take in a url and return a list of tokens.
     :param url: str
     :return: list of tokens
     """

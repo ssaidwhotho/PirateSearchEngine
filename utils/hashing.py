@@ -6,20 +6,19 @@ This file will contain the implementation and help for sim-hashing.
 from hashlib import sha256
 
 
-def hash_feature(feature):
-    """Hashes a single feature using SHA-256."""
-    return int(sha256(feature.encode('utf-8')).hexdigest(), 16)
-
-
 class Simhash:
     def __init__(self, num_features=256):
         """Initializes the Simhash with a given number of features, features meaning bits"""
         self.num_features = num_features
         self.hash_values = [0] * num_features
 
+    def hash_feature(self, feature):
+        """Hashes a single feature using SHA-256."""
+        return int(sha256(feature.encode('utf-8')).hexdigest(), 16)
+
     def add_feature(self, feature):
         """Adds a feature to the Simhash by applying bitwise operations."""
-        feature_hash = hash_feature(feature)
+        feature_hash = self.hash_feature(feature)
         for i in range(self.num_features):
             if (feature_hash >> i) & 1:  # Check if bit is set
                 self.hash_values[i] += 1  # Increment count for that bit
@@ -44,7 +43,7 @@ class Simhash:
         return 1 - (distance / self.num_features)
 
 
-def create_shingles(document: list, shingle_size: int = 3) -> list:
+def create_shingles(document: list , shingle_size: int = 3) -> list:
     """
     This function will take in a document and return a list of shingles.
     :param document: list

@@ -2,11 +2,13 @@
 import json
 import math
 import os
-from utils import tokenizer
+import utils.tokenizer as tokenizer
 
 from bs4 import BeautifulSoup
 from posting import Posting
 from utils.hashing import sim_hash, Simhash
+
+import time
 
 SAVE_FREQ = 10000
 DAMPING_FACTOR = 0.85
@@ -34,20 +36,20 @@ class InvertedIndex:
         This function is the starting function for creating the inverted index.
         :return:
         """
-        document_list = []
+        documents = []
         print(f"Starting to create the inverted index.")
         skipped_documents = 0
         sim_hashes_so_far = []
         # firstly we need to read all the documents
-        for root, dirs, files in os.walk('../DEV'):
-            for any_file in files:
-                if any_file.endswith('.json'):
-                    document_json = self.read_json(os.path.join(root, any_file))
-                    words = BeautifulSoup(document_json['content'], 'html.parser').get_text()
+        for root, dirs, files in os.walk('DEV'):
+            for file in files:
+                if file.endswith('.json'):
+                    document = self.read_json(os.path.join(root, file))
+                    words = BeautifulSoup(document['content'], 'html.parser').get_text()
                     if len(words) < 30:  # less than 30 words, skip
                         skipped_documents += 1
                         continue
-                    sim_hashes_so_far.append((sim_hash(tokenizer.tokenize(words)), document_json))
+                    sim_hashes_so_far.append((sim_hash(tokenizer.tokenize(words)), document))
                     if len(sim_hashes_so_far) % 1000 == 0:
                         print(f"Read {len(sim_hashes_so_far)} documents.")
 
@@ -56,14 +58,14 @@ class InvertedIndex:
         for i in range(len(sim_hashes_so_far)):
             if self.compare_hash(sim_hashes_so_far[i][0], sim_hashes_so_far[i][1]['url']):
                 continue
-            document_list.append(sim_hashes_so_far[i][1])
+            documents.append(sim_hashes_so_far[i][1])
 
         print(f"Finished reading all documents.")
-        print(f"Total documents to search: {len(document_list)}")
+        print(f"Total documents to search: {len(documents)}")
         with open("save_for_later.txt", 'w') as save_file:
-            for doc in document_list:
+            for doc in documents:
                 save_file.write(f"{doc['url']}\n")
-        self.build_index(document_list)  # build the inverted index
+        self.build_index(documents)  # build the inverted index
 
     def compare_hash(self, obj: Simhash, url: str) -> bool:
         # compare the hash with the existing hashes
@@ -77,22 +79,22 @@ class InvertedIndex:
         self.bits.append((obj, url))
         return False
 
-    def build_index(self, valid_documents: list) -> None:
+    def build_index(self, documents: list) -> None:
         print(f"Starting to create the inverted index.")
         skipped_documents = 0
         n = 0
-        for doc in valid_documents:
+        for doc in documents:
             self.url_dict[n] = (doc['url'], 0)
             n += 1
-        while len(valid_documents) > 0:
-            batch = valid_documents[:SAVE_FREQ]  # Get the first 10000 documents
-            valid_documents = valid_documents[SAVE_FREQ:]  # Remove the first 10000 documents
-            for doc_json in batch:
-                tokens, links = tokenizer.get_tokens(doc_json)
+        while len(documents) > 0:
+            batch = documents[:SAVE_FREQ]  # Get the first 10000 documents
+            documents = documents[SAVE_FREQ:]  # Remove the first 10000 documents
+            for document in batch:
+                tokens, links = tokenizer.get_tokens(document)
                 # hash the tokens and create the inverted index
                 self.id += 1
                 total_words = sum(tokens[token][0] for token in tokens.keys())
-                self.url_dict[self.id] = (doc_json['url'], total_words)
+                self.url_dict[self.id] = (document['url'], total_words)
 
                 for token in tokens.keys():
                     if token not in self.hash_table:
@@ -119,13 +121,13 @@ class InvertedIndex:
                         self.hash_table[token][self.id].add_field('z')
 
                 # To add tokens from the pages own URL
-                url_tokens = tokenizer.url_tokenize(doc_json['url'])
+                url_tokens = tokenizer.url_tokenize(document['url'])
                 for token in url_tokens:
                     if token not in self.hash_table:
                         self.hash_table[token] = {self.id: Posting(self.id)}
                     elif self.id not in self.hash_table[token]:
                         self.hash_table[token][self.id] = Posting(self.id)
-                    self.hash_table[token][self.id].add_field('lt')  # Add as a title and link
+                    self.hash_table[token][self.id].add_field('lt') #Add as a title and link
 
                 for hyper_links in links:
                     # get the id of the link and do page rank
@@ -192,27 +194,28 @@ class InvertedIndex:
             page_rank = new_page_rank
 
         # save the page rank values
-        with open('page_rank.txt', 'w') as page_file:
+        with open('page_rank.txt', 'w') as f:
             for key in page_rank.keys():
-                page_file.write(f"{key} {page_rank[key]}\n")
+                f.write(f"{key} {page_rank[key]}\n")
         print("Finished creating the page ranks.")
         self.page_rank = {}
 
     def sort_and_save_batch(self) -> None:
         # sort the hash table and save to custom txt file for seeking
+        # sort the dictionary by the keys alphabetically with numbers last
         self.hash_table = dict(sorted(self.hash_table.items(), key=lambda x: x[0]))
         # every new line is a token, and it's posting is to the right of the line
         # create a new file for the batch
         with open(f'inverted_index_{self.name}.txt', 'w') as new_save_file:
             for key in self.hash_table.keys():
                 new_save_file.write(key)
-                for id_of_doc in self.hash_table[key].keys():
+                for doc_id in self.hash_table[key].keys():
                     new_save_file.write(
-                        f" d{id_of_doc}"  # document id
-                        f"w{self.hash_table[key][id_of_doc].word_count}"  # word count
-                        f"t{self.hash_table[key][id_of_doc].tfidf}"  # tf-idf
-                        f"f{self.hash_table[key][id_of_doc].fields}"  # fields
-                        f"p{self.hash_table[key][id_of_doc].get_positions_str()}")  # positions [list]
+                        f" d{doc_id}"  # document id
+                        f"w{self.hash_table[key][doc_id].word_count}"  # word count
+                        f"t{self.hash_table[key][doc_id].tfidf}"  # tf-idf
+                        f"f{self.hash_table[key][doc_id].fields}"  # fields
+                        f"p{self.hash_table[key][doc_id].get_positions_str()}")  # positions [list]
                 new_save_file.write("\n")
             self.save_files.append(f'inverted_index_{self.name}.txt')
 
@@ -228,44 +231,44 @@ class InvertedIndex:
         # open all the files!
         # attempting multi-file merge
         file_handles = []
-        for opened_file in self.save_files:
-            file_handles.append(open(opened_file, 'r'))
+        for file in self.save_files:
+            file_handles.append(open(file, 'r'))
 
         # read a line for every file and then populate a term dictionary
         term_dict = {}
         lines = {i: file_handles[i].readline() for i in range(len(file_handles))}
         for i in range(len(file_handles)):
-            whole_line = lines[i]
-            if whole_line == '':
+            line = lines[i]
+            if line == '':
                 lines.pop(i)
             else:
-                term = whole_line.split(' ')[0]
+                term = line.split(' ')[0]
                 if term not in term_dict:
                     term_dict[term] = []
                 term_dict[term].append(i)
 
         # merge the files
-        with open('inverted_index.txt', 'w') as invert_file:
+        with open('inverted_index.txt', 'w') as f:
             while len(lines) > 0:
                 min_term = min(term_dict.keys())
                 min_lines = [lines[i] for i in term_dict[min_term]]
                 # merge the lines
                 merged_line = [min_term]
                 postings = []
-                for whole_line in min_lines:
+                for line in min_lines:
                     # create postings to get tf-idf
-                    postings.extend(whole_line.split(' ')[1:])
-                    merged_line.extend(whole_line.split(' ')[1:])
+                    postings.extend(line.split(' ')[1:])
+                    merged_line.extend(line.split(' ')[1:])
 
                 # calculate tf-idf
                 doc_freq = len(postings)
                 total_docs = len(self.url_dict)
                 for posting in postings:
                     # format = d{doc_id}w{word_count}t{tfidf}f{fields}p{positions:list}
-                    current_doc_id = int(posting[1:posting.index('w')])
+                    doc_id = int(posting[1:posting.index('w')])
                     word_count = int(posting[posting.index('w') + 1:posting.index('t')])
-                    len_of_doc = self.url_dict[int(current_doc_id)][1]
-                    tf = word_count / max(len_of_doc, 1)
+                    doc_len = self.url_dict[int(doc_id)][1]
+                    tf = word_count / max(doc_len, 1)
                     idf = 1 + math.log(total_docs / max(doc_freq, 1))
                     tfidf = tf * idf
                     # find the t index which is the document to update
@@ -273,13 +276,12 @@ class InvertedIndex:
                     # get the tfidf value saved in the posting
                     old_tfidf = float(posting[posting.index('t') + 1:posting.index('f')])
                     fields = posting[posting.index('f') + 1:posting.index('p')]
-                    new_posting = (f"d{current_doc_id}w{word_count}t{float(old_tfidf + tfidf)}f"
-                                   f"{fields}p{posting[posting.index('p') + 1:]}")
+                    new_posting = f"d{doc_id}w{word_count}t{float(old_tfidf+tfidf)}f{fields}p{posting[posting.index('p')+1:]}"
                     merged_line[t_index] = new_posting
                 merged_line = ' '.join(merged_line)
                 # take out all the new lines
                 merged_line = merged_line.replace('\n', '')
-                invert_file.write(merged_line + '\n')
+                f.write(merged_line + '\n')
                 # read the next line
                 for i in term_dict[min_term]:
                     lines[i] = file_handles[i].readline()
@@ -293,21 +295,21 @@ class InvertedIndex:
                 term_dict.pop(min_term)
 
         # close all the files
-        for opened_file in file_handles:
-            opened_file.close()
-            os.remove(opened_file.name)
+        for file in file_handles:
+            file.close()
+            os.remove(file.name)
 
         print("Creating the bookkeeping file.")
-        with open('inverted_index.txt', 'r') as invert_file:
+        with open('inverted_index.txt', 'r') as f:
             # get the positions of each token
             token_list = []
             token_pos_list = []
             while True:
-                pos = invert_file.tell()  # get the position of the file for seek
-                whole_line = invert_file.readline()  # read the line
-                if not whole_line:
+                pos = f.tell()  # get the position of the file for seek
+                line = f.readline()  # read the line
+                if not line:
                     break
-                word = whole_line.split(' ')[0]
+                word = line.split(' ')[0]
                 token_list.append(word)
                 token_pos_list.append(pos)
             # save the positions
@@ -326,18 +328,16 @@ class InvertedIndex:
 
 if __name__ == "__main__":
     inverted_index = InvertedIndex()
-    # url_dict = {}
+    #url_dict = {}
     # inverted_index.create_inverted_index()
-    """
-    TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index 
-    creation with Adam's info
-    """
+    # TODO: Uncomment the above line for full run and uncomment the below lines to run the inverted index creation with Adam's info
     documents = []
     documents_read = 0
+    start_time = time.time()
     with open("url_dict.txt", 'r') as f:
         # find the document[url] that matches with the url and populate a list of docs
         document_dict = {}
-        for root, dirs, files in os.walk('../DEV'):
+        for root, dirs, files in os.walk('DEV'):
             for file in files:
                 if file.endswith('.json'):
                     document = inverted_index.read_json(os.path.join(root, file))
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         print("reading the url_dict.txt file.")
         for line in f:
             doc_id, url, doc_len = line.split(' ')
-            # url_dict[int(doc_id)] = (url, int(doc_len))
+            #url_dict[int(doc_id)] = (url, int(doc_len))
             # now look through dev folder to find the document
             if url in document_dict:
                 documents.append(document_dict[url])
@@ -354,6 +354,8 @@ if __name__ == "__main__":
                 print(f"Read {documents_read} documents.")
         document_dict = {}
 
+    end_time = time.time()
+    print(f"Time it takes to parse the documents: {end_time - start_time:.10f} seconds.")
     print("read all the documents.")
     inverted_index.build_index(documents)
     exit(0)

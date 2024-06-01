@@ -1,21 +1,24 @@
-from utils import tokenizer
+import utils.tokenizer as tokenizer
 from pathlib import Path
 import time
 import os
+import math
 
-PROXIMITY_WEIGHT = 0.5   # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
-BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013]
+PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 
+#older best_weights[0.664645, 0.9206789999999999, 7.48427, 0.6706199999999999, 12.37362, 0.7252109999999999, -0.19983, 0.27105599999999996, 4.18218] are best weights
+#old BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
+#old BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013, -0.47591, 2.78897, -0.47591, 2.78897]
+BEST_WEIGHTS = [0.97418, 0.8697389999999999, 6.55706, 0.5389619999999999, 6.13456, 1.212597, 7.29917, 1.09506, -6.91121, 0.920895, 5.69314, 1.9736159999999998, -1.28111]
 
-class SearchEngine:
+class search_engine:
     """This class will run the search engine."""
-
     def __init__(self):
-        print("Search Engine Started")
-
-        if not check_files_exist():
-            print("Search engine closing, Goodbye!")
-            exit(1)
+        # print("Search Engine Started")
+        #
+        # if not check_files_exist():
+        #     print("Search engine closing, Goodbye!")
+        #     exit(1)
 
         self.pagerank_weight = BEST_WEIGHTS[0]
         self.tfidf_weight = 1 - self.pagerank_weight
@@ -23,12 +26,15 @@ class SearchEngine:
         self.linked_weight = BEST_WEIGHTS[2]
         self.title_weight = BEST_WEIGHTS[4]
         self.header_weight = BEST_WEIGHTS[6]
-
+        self.h2_weight = BEST_WEIGHTS[10]
+        self.h3_weight = BEST_WEIGHTS[12]
         self.bold_weight = BEST_WEIGHTS[8]
         self.m_linked_weight = BEST_WEIGHTS[1]
         self.m_title_weight = BEST_WEIGHTS[3]
         self.m_header_weight = BEST_WEIGHTS[5]
         self.m_bold_weight = BEST_WEIGHTS[7]
+        self.m_h2_weight = BEST_WEIGHTS[9]
+        self.m_h3_weight = BEST_WEIGHTS[11]
 
 
         self.token_list = []
@@ -42,8 +48,9 @@ class SearchEngine:
         self.top_words = get_top_words("top_words.txt")
 
         self.total_tfidf = get_total_tfidf()
-        self.min_tf = self.min_tf / self.total_tfidf  # Normalize the min and max tfidf values
+        self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
         self.max_tf = self.max_tf / self.total_tfidf
+
 
     def start_search_engine(self):
         """Main function to run the search engine"""
@@ -57,10 +64,11 @@ class SearchEngine:
                     continue
 
                 print("(TESTING) Query: ", result)
-                result = self.run_query(f, result)
-                self.print_results(result)
+                result, test_res = self.run_query(f, result)
+                self.print_results(result, test_res)
 
         print("Search engine closing, Goodbye!")
+
 
     def load_bookkeeping_lists(self) -> None:
         """This function will load the bookkeeping lists into memory."""
@@ -68,7 +76,7 @@ class SearchEngine:
         pos_list = []
         with open("token_positions_list.txt", "r") as f:
             for line in f:
-                if line[0] == ":" or line == "\n":  #Shouldn't be necessary, but an easy precaution
+                if line[0] == ":" or line == "\n": #Shouldn't be necessary, but an easy precaution
                     continue
                 token, pos = line.split(":")
                 token_list.append(token)
@@ -91,7 +99,8 @@ class SearchEngine:
         self.url_dict = url_dict
         self.page_rank = page_rank
 
-    def print_results(self, result: list) -> None:
+
+    def print_results(self, result: list, test_res:list) -> None:
         """This function will print the results of the search query."""
         if len(result) == 0:
             print("No results found.")
@@ -101,9 +110,19 @@ class SearchEngine:
             return
         print("Results: ")
         for i in range(min(10, len(result))):
+            total_tfidf = []
+            total_mult = []
+            total_proximity = []
+            pg = 0
+            for t in test_res[i][:-1]:
+                total_tfidf.append(t[0])
+                total_mult.append(t[1])
+                total_proximity.append(t[2])
+            pg = test_res[i][-1]
             print(f"{i + 1}. doc_id={result[i]}, tf url={self.url_dict[result[i]]}")
+            print(f"(TESTING) tfidf={total_tfidf}, mult={total_mult}, proximity={total_proximity}, pagerank={pg}")
 
-    def run_query(self, f, query: str) -> list:
+    def run_query(self, f, query: str) -> (list, list):
         """This function will run the query and return the results."""
         # Start timer here
         start_time = time.time()
@@ -166,7 +185,9 @@ class SearchEngine:
 
         # Step 4: Rank the documents based on the query
         doc_rankings = {}
+        test_rankings = {}
         sorted_rankings = []
+        test_sorted = []
         for i, pos in enumerate(q_pos):
             f.seek(int(pos))
 
@@ -179,56 +200,68 @@ class SearchEngine:
             multiplier = 1
             if token in duplicate_tokens:
                 multiplier += len(duplicate_tokens[token])
-            postings = self.decode_postings(search_ranges[i], lines[1:])
+            postings = decode_postings(search_ranges[i], lines[1:])
 
             for post in postings:
                 doc_id, word_count, tfidf, fields, positions = post
-                tfidf = float(tfidf) / self.total_tfidf  # Normalize the tfidf
+                tfidf = float(tfidf) / self.total_tfidf # Normalize the tfidf
+                #tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf between 0-1
 
                 proximity_multiplier = 1
                 last_change = 1
-                for j in range(multiplier - 1):
+                for j in range(multiplier-1):
                     for n in range(check_distance(positions, duplicate_tokens[token][j])):
                         last_change = last_change * self.proximity_weight
                         proximity_multiplier += last_change
 
                 for field in fields:
-                    if field == "l":  # linked on another page
+                    if field == "l": #linked on another page
                         tfidf += self.linked_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_linked_weight:.7f}")
-                    elif field == "t":  # title
+                    elif field == "t": #title
                         tfidf += self.title_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_title_weight:.7f}")
-                    elif field == "x":  # header
+                    elif field == "x": #h1
                         tfidf += self.header_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_header_weight:.7f}")
-                    elif field == "b":  # bold
+                    elif field == "y": #h2
+                        tfidf += self.h2_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_h2_weight:.7f}")
+                    elif field == "z": #h3
+                        tfidf += self.h3_weight
+                        tfidf = float(f"{tfidf:.7f}")
+                        tfidf *= float(f"{self.m_h3_weight:.7f}")
+                    elif field == "b": #bold
                         tfidf += self.bold_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_bold_weight:.7f}")
 
                 if doc_id in doc_rankings:
                     doc_rankings[doc_id] += tfidf * multiplier * proximity_multiplier
+                    test_rankings[doc_id].append([tfidf, multiplier, proximity_multiplier])
                 else:
                     doc_rankings[doc_id] = tfidf * multiplier * proximity_multiplier
+                    test_rankings[doc_id] = [[tfidf, multiplier, proximity_multiplier]]
 
         for doc_id in doc_rankings:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
+            test_rankings[doc_id].append(self.test_return_pg(doc_id))
 
         # Step 4.5: Sort the documents by their rankings
-        for key in sorted(doc_rankings, key=doc_rankings.get, reverse=True):
+        for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
             sorted_rankings.append(key)
+            test_sorted.append(test_rankings[key])
 
         # End timer here
         end_time = time.time()
-        print(
-            f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+        #TODO: Uncomment: print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
-        return sorted_rankings
+        return sorted_rankings, test_sorted
 
     def combine_tf_pg(self, doc_id: str, tfidf: float) -> float:
         """This function will combine the tfidf and pagerank values."""
@@ -239,42 +272,52 @@ class SearchEngine:
         #pg = math.log(pg+1,1000000000000)
         return self.tfidf_weight * tfidf + self.pagerank_weight * pg
 
-    def decode_postings(self, search_range: int, postings: list) -> list:
-        """This function will decode the postings list and return it as a list of tuples."""
-        if search_range == 0.0:
-            return []
-        decoded = []
-        top_tfidf = []
-        if search_range != -1:
-            top_tfidf = [0.0 for i in range(int(search_range))]
+    def test_return_pg(self, doc_id: str) -> float:
+        """This function will combine the tfidf and pagerank values."""
+        pg = self.min_pg
+        if doc_id in self.page_rank:
+            pg = self.page_rank[doc_id]
+        #pg = (pg - self.min_pg) / (self.max_pg - self.min_pg)
+        #pg = math.log(pg+1,1000000000000)
+        return pg
 
-        for post in postings:
-            doc_id, other = post.split("w")
-            doc_id = doc_id[1:]
-            first_t = other.index("t")
-            word_count = other[0:first_t]
-            other = other[first_t + 1:]
-            word_count = int(word_count)
-            tfidf, fields = other.split("f")
-            tfidf = float(tfidf)
-            if search_range != -1 and len(top_tfidf) > 0:
-                if tfidf > top_tfidf[0]:
-                    ind = binary_search_index(top_tfidf, tfidf)
-                    top_tfidf.insert(ind, tfidf)
-                    top_tfidf.pop(0)
-                else:
-                    continue
-            fields, positions = other.split("p")
-            if len(positions) > 0 and positions[
-                0] == "[":  # Check to make sure positions isn't empty
-                positions = positions[1:-1].split(",")
-                if positions[-1][-1] == ']':
-                    positions[-1] = positions[-1][:-1]
-                positions = [int(pos) for pos in positions]
+def decode_postings(search_range: int, postings: list) -> list:
+    """This function will decode the postings list and return it as a list of tuples."""
+    if search_range == 0.0:
+        return []
+    decoded = []
+    top_tfidf = []
+    if search_range != -1:
+        top_tfidf = [0.0 for i in range(int(search_range))]
+
+
+    for post in postings:
+        doc_id, other = post.split("w")
+        doc_id = doc_id[1:]
+        first_t = other.index("t")
+        word_count = other[0:first_t]
+        other = other[first_t + 1:]
+        word_count = int(word_count)
+        tfidf, fields = other.split("f")
+        tfidf = float(tfidf)
+        if search_range != -1 and len(top_tfidf) > 0:
+            if tfidf > top_tfidf[0]:
+                ind = binary_search_index(top_tfidf, tfidf)
+                top_tfidf.insert(ind, tfidf)
+                top_tfidf.pop(0)
             else:
-                positions = []
-            decoded.append((doc_id, word_count, tfidf, fields, positions))
-        return decoded
+                continue
+        fields, positions = other.split("p")
+        if len(positions) > 0 and positions[
+            0] == "[":  # Check to make sure positions isn't empty
+            positions = positions[1:-1].split(",")
+            if positions[-1][-1] == ']':
+                positions[-1] = positions[-1][:-1]
+            positions = [int(pos) for pos in positions]
+        else:
+            positions = []
+        decoded.append((doc_id, word_count, tfidf, fields, positions))
+    return decoded
 
 
 def binary_search(arr: list, target: str) -> int:
@@ -316,12 +359,11 @@ def get_min_max(file_name: str) -> (float, float):
     with open(file_name, "r") as f:
         top_line = f.readline()
         line = top_line.split(": ")
-        max_val = float(line[1])
+        max_val =  float(line[1])
 
     with open(file_name, "rb") as f:
         try:
-            f.seek(-2,
-                   os.SEEK_END)  # Code from https://stackoverflow.com/questions/46258499/how-to-read-the-last-line-of-a-file-in-python
+            f.seek(-2, os.SEEK_END)  # Code from https://stackoverflow.com/questions/46258499/how-to-read-the-last-line-of-a-file-in-python
             while f.read(1) != b'\n':
                 f.seek(-2, os.SEEK_CUR)
         except OSError:
@@ -335,26 +377,26 @@ def get_min_max(file_name: str) -> (float, float):
 
 def get_stop_words() -> list:
     stop_words = [
-        'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
-        'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
-        'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
-        'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
-        "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
-        "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
-        "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
-        'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
-        'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
-        'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
-        'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
-        'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
-        'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
-        'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
-        'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
-        'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
-        "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
-        "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
-        "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
-        "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+            'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
+            'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
+            'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
+            'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
+            "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
+            "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
+            "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
+            'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
+            'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
+            'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
+            'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
+            'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
+            'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
+            'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
+            'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
+            'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
+            "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
+            "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
+            "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
     return stop_words
 
 
@@ -408,7 +450,7 @@ def check_files_exist() -> bool:
     return True
 
 
-def get_query() -> str:  #Replaced with the GUI
+def get_query() -> str: #Replaced with the GUI
     """This function will get the query from the user and return it as a string."""
     query = input("\nEnter a query or type 'exit' to quit: ")
     if query.lower() == "exit":
@@ -434,5 +476,5 @@ def check_distance(word_positions: list, distance: int) -> int:
 
 
 if __name__ == "__main__":
-    search = SearchEngine()
+    search = search_engine()
     search.start_search_engine()
