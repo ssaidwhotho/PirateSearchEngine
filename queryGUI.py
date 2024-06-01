@@ -1,45 +1,17 @@
 import streamlit as st
 import time
-from query import SearchEngine as se, check_files_exist
+from query import SearchEngine, check_files_exist, get_stop_words
 import requests
 from bs4 import BeautifulSoup
 import re
 import html
 
-## test
-#from memory_profiler import profile
-
-
+# OpenAI API key
 api_key = "sk-proj-Zte7OZtDW8CTRUyBaul4T3BlbkFJwb20WT0IGnSmsKZrekNM"
 headers = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {api_key}",
 }
-
-
-def get_stop_words() -> list:
-    stop_words = [
-        'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
-        'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
-        'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
-        'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
-        "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
-        "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
-        "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
-        'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
-        'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
-        'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
-        'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
-        'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
-        'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
-        'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
-        'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
-        'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
-        "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
-        "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
-        "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
-        "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
-    return stop_words
 
 
 def fetch_content(url):
@@ -117,22 +89,19 @@ def gui():
                             placeholder="e.g. \"Yarrrr! Pirate ships\" or \"Ahoy! Maps o' treasure\"")
     submit_button = form.form_submit_button("Ponder yar query")
 
-    #st.image("FishingRod.gif")
-    #st.logo("PirateWheelSpin.gif")
-
     # Load the inverted index and bookkeeping lists once when the app starts
     if not check_files_exist():
         st.error("Necessary files not found. Please check the instructions and try again.")
         st.stop()
 
-    search_engine = se()
+    search_engine = SearchEngine()
 
     if submit_button:
         if len(query) == 0:
             st.error("Query cannot be empty.")
         else:
             pondering = st.html("<p>Yarrrr! Searching the seven seas...</p>")
-            fishingrod = st.image("ShipBottle.gif")
+            fishing_rod = st.image("images/ShipBottle.gif")
             start_time = time.time()
 
             # Run query using the loaded bookkeeping lists
@@ -147,7 +116,7 @@ def gui():
                     result = search_engine.run_query(f, query)
 
             end_time = time.time()
-            st.markdown(f"**{len(result)} results found in {end_time - start_time:.10f} seconds.**")
+            st.markdown(f":grey[**{len(result)} results found in {end_time - start_time:.10f} seconds.**]")
 
             # Fetch and summarize the content of the pages
             for i, doc_id in enumerate(result[:min(10, len(result))]):
@@ -166,9 +135,9 @@ def gui():
                     summary = content_or_error
 
                 st.markdown(f"**{i + 1}.** [{url}](url)", unsafe_allow_html=False)
-                st.markdown(f"**Summary:** {summary}")
+                st.markdown(f"**Summary:** :grey[{summary}]")
 
-            fishingrod.empty()
+            fishing_rod.empty()
             pondering.empty()
 
 

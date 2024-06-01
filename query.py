@@ -3,10 +3,7 @@ from pathlib import Path
 import time
 import os
 
-PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
-
-#older best_weights[0.664645, 0.9206789999999999, 7.48427, 0.6706199999999999, 12.37362, 0.7252109999999999, -0.19983, 0.27105599999999996, 4.18218] are best weights
-#old BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
+PROXIMITY_WEIGHT = 0.5   # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013]
 
 
@@ -187,7 +184,6 @@ class SearchEngine:
             for post in postings:
                 doc_id, word_count, tfidf, fields, positions = post
                 tfidf = float(tfidf) / self.total_tfidf  # Normalize the tfidf
-                #tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf between 0-1
 
                 proximity_multiplier = 1
                 last_change = 1
@@ -197,27 +193,19 @@ class SearchEngine:
                         proximity_multiplier += last_change
 
                 for field in fields:
-                    if field == "l":  #linked on another page
+                    if field == "l":  # linked on another page
                         tfidf += self.linked_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_linked_weight:.7f}")
-                    elif field == "t":  #title
+                    elif field == "t":  # title
                         tfidf += self.title_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_title_weight:.7f}")
-                    elif field == "h":  #header, TODO: change to "x" and h1
+                    elif field == "x":  # header
                         tfidf += self.header_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_header_weight:.7f}")
-                    # elif field == "y": #h2
-                    #     tfidf += self.h2_weight
-                    #     tfidf = float(f"{tfidf:.7f}")
-                    #     tfidf *= float(f"{self.m_h2_weight:.7f}")
-                    # elif field == "z": #h3
-                    #     tfidf += self.h3_weight
-                    #     tfidf = float(f"{tfidf:.7f}")
-                    #     tfidf *= float(f"{self.m_h3_weight:.7f}")
-                    elif field == "b":  #bold
+                    elif field == "b":  # bold
                         tfidf += self.bold_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_bold_weight:.7f}")
