@@ -1,8 +1,7 @@
-import tokenizer
+from utils import tokenizer
 from pathlib import Path
 import time
 import os
-import math
 
 PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25% to the second, 12.5% to the third, etc.
 
@@ -10,8 +9,10 @@ PROXIMITY_WEIGHT = 0.5  # 0.5 = 50% of the weight is given to the first word, 25
 #old BEST_WEIGHTS = [0.046028000000000006, 0.9206789999999999, 5.3574, 0.719805, 12.42027, 0.849249, 8.08629, 0.503745, 10.20018]
 BEST_WEIGHTS = [0.82536, 0.82337, 5.86986, 1.03176, 7.43271, -0.47591, 2.78897, 1.45966, 0.23013]
 
-class search_engine:
+
+class SearchEngine:
     """This class will run the search engine."""
+
     def __init__(self):
         print("Search Engine Started")
 
@@ -25,15 +26,12 @@ class search_engine:
         self.linked_weight = BEST_WEIGHTS[2]
         self.title_weight = BEST_WEIGHTS[4]
         self.header_weight = BEST_WEIGHTS[6]
-        #self.h2_weight = BEST_WEIGHTS[10]
-        #self.h3_weight = BEST_WEIGHTS[12]
+
         self.bold_weight = BEST_WEIGHTS[8]
         self.m_linked_weight = BEST_WEIGHTS[1]
         self.m_title_weight = BEST_WEIGHTS[3]
         self.m_header_weight = BEST_WEIGHTS[5]
         self.m_bold_weight = BEST_WEIGHTS[7]
-        #self.m_h2_weight = BEST_WEIGHTS[9]
-        #self.m_h3_weight = BEST_WEIGHTS[11]
 
 
         self.token_list = []
@@ -47,9 +45,8 @@ class search_engine:
         self.top_words = get_top_words("top_words.txt")
 
         self.total_tfidf = get_total_tfidf()
-        self.min_tf = self.min_tf / self.total_tfidf # Normalize the min and max tfidf values
+        self.min_tf = self.min_tf / self.total_tfidf  # Normalize the min and max tfidf values
         self.max_tf = self.max_tf / self.total_tfidf
-
 
     def start_search_engine(self):
         """Main function to run the search engine"""
@@ -68,14 +65,13 @@ class search_engine:
 
         print("Search engine closing, Goodbye!")
 
-
     def load_bookkeeping_lists(self) -> None:
         """This function will load the bookkeeping lists into memory."""
         token_list = []
         pos_list = []
         with open("token_positions_list.txt", "r") as f:
             for line in f:
-                if line[0] == ":" or line == "\n": #Shouldn't be necessary, but an easy precaution
+                if line[0] == ":" or line == "\n":  #Shouldn't be necessary, but an easy precaution
                     continue
                 token, pos = line.split(":")
                 token_list.append(token)
@@ -97,7 +93,6 @@ class search_engine:
         self.pos_list = pos_list
         self.url_dict = url_dict
         self.page_rank = page_rank
-
 
     def print_results(self, result: list) -> None:
         """This function will print the results of the search query."""
@@ -191,26 +186,26 @@ class search_engine:
 
             for post in postings:
                 doc_id, word_count, tfidf, fields, positions = post
-                tfidf = float(tfidf) / self.total_tfidf # Normalize the tfidf
+                tfidf = float(tfidf) / self.total_tfidf  # Normalize the tfidf
                 #tfidf = (float(tfidf) - self.min_tf) / (self.max_tf - self.min_tf) # Normalize the tfidf between 0-1
 
                 proximity_multiplier = 1
                 last_change = 1
-                for j in range(multiplier-1):
+                for j in range(multiplier - 1):
                     for n in range(check_distance(positions, duplicate_tokens[token][j])):
                         last_change = last_change * self.proximity_weight
                         proximity_multiplier += last_change
 
                 for field in fields:
-                    if field == "l": #linked on another page
+                    if field == "l":  #linked on another page
                         tfidf += self.linked_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_linked_weight:.7f}")
-                    elif field == "t": #title
+                    elif field == "t":  #title
                         tfidf += self.title_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_title_weight:.7f}")
-                    elif field == "h": #header, TODO: change to "x" and h1
+                    elif field == "h":  #header, TODO: change to "x" and h1
                         tfidf += self.header_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_header_weight:.7f}")
@@ -222,7 +217,7 @@ class search_engine:
                     #     tfidf += self.h3_weight
                     #     tfidf = float(f"{tfidf:.7f}")
                     #     tfidf *= float(f"{self.m_h3_weight:.7f}")
-                    elif field == "b": #bold
+                    elif field == "b":  #bold
                         tfidf += self.bold_weight
                         tfidf = float(f"{tfidf:.7f}")
                         tfidf *= float(f"{self.m_bold_weight:.7f}")
@@ -236,12 +231,13 @@ class search_engine:
             doc_rankings[doc_id] = self.combine_tf_pg(doc_id, doc_rankings[doc_id])
 
         # Step 4.5: Sort the documents by their rankings
-        for key in sorted(doc_rankings, key = doc_rankings.get, reverse = True):
+        for key in sorted(doc_rankings, key=doc_rankings.get, reverse=True):
             sorted_rankings.append(key)
 
         # End timer here
         end_time = time.time()
-        print(f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
+        print(
+            f"{len(sorted_rankings)} results found in {end_time - start_time:.10f} seconds. Less than 300ms = {end_time - start_time < 0.3}")
 
         # Step 5: Return the top documents in order
         return sorted_rankings
@@ -263,7 +259,6 @@ class search_engine:
         top_tfidf = []
         if search_range != -1:
             top_tfidf = [0.0 for i in range(int(search_range))]
-
 
         for post in postings:
             doc_id, other = post.split("w")
@@ -333,11 +328,12 @@ def get_min_max(file_name: str) -> (float, float):
     with open(file_name, "r") as f:
         top_line = f.readline()
         line = top_line.split(": ")
-        max_val =  float(line[1])
+        max_val = float(line[1])
 
     with open(file_name, "rb") as f:
         try:
-            f.seek(-2, os.SEEK_END)  # Code from https://stackoverflow.com/questions/46258499/how-to-read-the-last-line-of-a-file-in-python
+            f.seek(-2,
+                   os.SEEK_END)  # Code from https://stackoverflow.com/questions/46258499/how-to-read-the-last-line-of-a-file-in-python
             while f.read(1) != b'\n':
                 f.seek(-2, os.SEEK_CUR)
         except OSError:
@@ -351,26 +347,26 @@ def get_min_max(file_name: str) -> (float, float):
 
 def get_stop_words() -> list:
     stop_words = [
-            'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
-            'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
-            'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
-            'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
-            "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
-            "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
-            "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
-            'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
-            'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
-            'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
-            'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
-            'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
-            'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
-            'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
-            'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
-            'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
-            "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
-            "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
-            "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
-            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+        'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
+        'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
+        'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
+        'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
+        "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
+        "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
+        "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
+        'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
+        'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
+        'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
+        'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
+        'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
+        'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
+        'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
+        'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
+        'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
+        "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
+        "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
+        "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+        "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
     return stop_words
 
 
@@ -424,7 +420,7 @@ def check_files_exist() -> bool:
     return True
 
 
-def get_query() -> str: #Replaced with the GUI
+def get_query() -> str:  #Replaced with the GUI
     """This function will get the query from the user and return it as a string."""
     query = input("\nEnter a query or type 'exit' to quit: ")
     if query.lower() == "exit":
@@ -450,5 +446,5 @@ def check_distance(word_positions: list, distance: int) -> int:
 
 
 if __name__ == "__main__":
-    search = search_engine()
+    search = SearchEngine()
     search.start_search_engine()
