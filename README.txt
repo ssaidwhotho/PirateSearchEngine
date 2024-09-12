@@ -1,4 +1,4 @@
-Assignment 3 - Search Engine M3 CS 121 - Spring 2024 Prof. Krone-Martins
+PirateSearchEngine
 
 Made by: [Leonardo Louis Gutierrez IV, Ashar Huda, Adam Gans, Samuel Mallari]
 
