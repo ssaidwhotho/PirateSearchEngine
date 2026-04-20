@@ -10,7 +10,7 @@ import html
 #from memory_profiler import profile
 
 
-api_key = "sk-proj-Zte7OZtDW8CTRUyBaul4T3BlbkFJwb20WT0IGnSmsKZrekNM"
+api_key = ""
 headers = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {api_key}",
